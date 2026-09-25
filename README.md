@@ -1,43 +1,47 @@
-# TPV · Asador de Pollos Virgen del Carmen
+# TPV · Asador de Pollos Virgen del Carmen (v2)
 
-TPV web para restaurante de comida para llevar. Sin dependencias: HTML + CSS + JS en un solo archivo.
-Funciona en cualquier navegador (escritorio, tablet y móvil) e incluye impresión de tickets (80mm).
+TPV web para comida para llevar con **base de datos real (Supabase)**:
+login de empleados, datos persistentes, sincronización en tiempo real entre
+dispositivos (caja ↔ cocina) y carta editable desde el propio TPV.
 
-## Funcionalidades
+Sin build: HTML + CSS + JS. Despliegue estático en Vercel.
 
-- **Nuevo pedido**: Recogida / Domicilio / Mostrador, cliente + teléfono, hora de recogida programada, repartidor propio, notas
-- **Pedidos**: estados Nuevo → En cocina → Listo → Entregado, edición, cobro
-- **Cocina (KDS)**: comandas en tiempo real con tiempo de preparación
-- **Caja**: apertura con fondo, movimientos entrada/salida, arqueo de cierre, desglose por método de pago
-- **Control**: ventas del día, ticket medio, tiempo medio de preparación, gestión de repartidores
-- **Ticket**: impresión automática tras cobro + botón manual (formato térmico 80mm)
+## Puesta en marcha (10 min)
 
-## Desarrollo local
+### 1. Supabase
+1. Crea el proyecto en [supabase.com](https://supabase.com) (región Frankfurt)
+2. **SQL Editor** → pega todo `supabase/schema.sql` → **Run**
+3. **Authentication → Users → Add user**: crea un email + contraseña por empleado
+4. **Project Settings → API**: copia la **Project URL** y la **anon public key**
 
-Abre `index.html` directamente en el navegador, o sirve la carpeta:
-
-```bash
-npx serve .
+### 2. Configurar el TPV
+En `index.html`, líneas del bloque `SUPABASE v2` (busca `TU_PROYECTO`):
+```js
+const SUPABASE_URL = 'https://TU_PROYECTO.supabase.co';
+const SUPABASE_ANON_KEY = 'TU_ANON_KEY';
 ```
+Pega tus credenciales. Si las dejas con el placeholder, la app funciona en
+**modo local** (todo en memoria, al cerrar se pierde — solo para pruebas).
 
-## Despliegue en Vercel
-
-1. Sube este repositorio a GitHub
-2. En [vercel.com](https://vercel.com) → **Add New Project** → importa el repo
-3. Framework: *Other* · Build: vacío · Output: raíz del proyecto
-4. Deploy. Listo: tendrás URL `https://tu-proyecto.vercel.app`
-
-O desde la terminal con Vercel CLI:
-
+### 3. GitHub + Vercel
 ```bash
-npm i -g vercel
-vercel
+git add .
+git commit -m "v2: Supabase, login y tiempo real"
+git push
 ```
+Vercel redespliega automáticamente.
 
-## Roadmap (siguientes pasos)
+## Flujo de trabajo diario
 
-- [ ] Persistencia real (base de datos Supabase/Postgres)
-- [ ] Autenticación de empleados
-- [ ] Carta editable desde el propio TPV
-- [ ] Impresión directa de comanda en cocina (WebUSB/RAW)
-- [ ] Histórico de arqueos y ventas por fechas
+1. Empleado abre la URL e inicia sesión
+2. Abre la caja con el fondo inicial (pestaña Caja)
+3. Toma pedidos → envía a cocina → cobra → ticket
+4. Cocina ve las comandas en su pantalla en tiempo real
+5. Al final del día: arqueo y cierre de caja
+
+## Roadmap
+
+- [ ] Histórico de arqueos consultable
+- [ ] Impresión directa de comanda en cocina
+- [ ] Pedidos por WhatsApp/teléfono
+- [ ] Dominio propio + HTTPS forzado
