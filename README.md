@@ -1,4 +1,4 @@
-# TPV · Asador de Pollos Virgen del Carmen (v2)
+# TPV · Asador de Pollos Virgen del Carmen (v2 + Fase 1)
 
 TPV web para comida para llevar con **base de datos real (Supabase)**:
 login de empleados, datos persistentes, sincronización en tiempo real entre
@@ -45,3 +45,14 @@ Vercel redespliega automáticamente.
 - [ ] Impresión directa de comanda en cocina
 - [ ] Pedidos por WhatsApp/teléfono
 - [ ] Dominio propio + HTTPS forzado
+
+## Novedades Fase 1
+
+- **Histórico completo**: buscador por nombre/teléfono/nº + filtros por fechas; se cargan todos los pedidos
+- **Comanda automática en cocina**: se imprime sola al enviar el pedido (activable en Configuración)
+- **Cancelar pedidos** con motivo, quedan archivados
+- **Arqueos guardados**: cada cierre queda registrado y consultable en la pestaña Caja
+- **Configuración del negocio**: nombre, dirección, teléfono, NIF y pie de ticket editables desde el TPV
+
+### Actualizar una instalación existente
+Ejecuta `supabase/schema-update-fase1.sql` en SQL Editor y sube el nuevo `index.html`.
