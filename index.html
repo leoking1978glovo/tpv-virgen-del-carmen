@@ -176,6 +176,12 @@
   .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 
   .ped-card.st-cancelado{border-left-color:#bbb;opacity:.55}
+.ped-mini{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:8px;box-shadow:var(--shadow);font-size:13px}
+.ped-mini .pm-id{font-weight:800;white-space:nowrap}
+.ped-mini .pm-who{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ped-mini .pm-meta{color:var(--ink2);white-space:nowrap;font-size:12px}
+.ped-mini .pm-total{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+@media(max-width:700px){.ped-mini .pm-meta{display:none}}
 .ksearch{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
 .ksearch input{padding:10px 13px;border:2px solid var(--line);border-radius:11px;font-size:13px;font-weight:600;background:var(--card)}
 .ksearch input[type=text]{flex:1;min-width:150px}
@@ -1119,6 +1125,22 @@ function renderPedidos(){
   if(pedFilter==='entregado'||pedFilter==='cancelado') list=list.slice(0,50);
   document.getElementById('ped-badge').textContent = state.pedidos.filter(p=>isActiveStatus(p.status)).length;
   const el=document.getElementById('ped-list');
+  if(pedFilter==='entregado'||pedFilter==='cancelado'){
+    el.innerHTML = list.length?
+      ((pedFilter==='entregado'&&state.pedidos.filter(p=>p.status==='entregado').length>50)?'<div style="font-size:12px;color:var(--ink2);padding:6px 2px">Mostrando los 50 más recientes — usa el buscador para encontrar cualquiera.</div>':'')+
+      list.map(p=>{ const mins=Math.round((Date.now()-p.t)/60000);
+        return `<div class="ped-mini">
+          <span class="pm-id">${orderLabel(p)}</span>
+          <span class="pm-who"><b>${p.name}</b>${p.phone?' · '+p.phone:''}</span>
+          <span class="pm-meta">${p.items.reduce((s,i)=>s+i.qty,0)} art · hace ${mins} min</span>
+          <span class="chip ${STATUS[p.status].chip}">${STATUS[p.status].label}</span>
+          <span class="pm-total">${fmt(p.total)}</span>
+          <button class="btn btn-ghost" data-print="${p.id}" title="Reimprimir ticket">🖨️</button>
+        </div>`;}).join('')
+      : '<div style="color:var(--ink2);padding:40px;text-align:center">No hay pedidos con estos filtros.</div>';
+    el.querySelectorAll('[data-print]').forEach(b=>b.onclick=()=>printTicket(+b.dataset.print));
+    return;
+  }
   el.innerHTML = list.length? ((pedFilter==='entregado'&&state.pedidos.filter(p=>p.status==='entregado').length>50)?'<div style="font-size:12px;color:var(--ink2);padding:6px 2px">Mostrando los 50 más recientes — usa el buscador para encontrar cualquiera.</div>':'')+list.map(p=>{
     const mins=Math.round((Date.now()-p.t)/60000);
     const active=isActiveStatus(p.status);
