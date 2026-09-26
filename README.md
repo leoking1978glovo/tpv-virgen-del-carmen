@@ -1,4 +1,4 @@
-# TPV · Asador de Pollos Virgen del Carmen (v2 + Fase 1)
+# TPV · Asador de Pollos Virgen del Carmen (v2 + Fase 1 + Fase 2)
 
 TPV web para comida para llevar con **base de datos real (Supabase)**:
 login de empleados, datos persistentes, sincronización en tiempo real entre
@@ -56,3 +56,14 @@ Vercel redespliega automáticamente.
 
 ### Actualizar una instalación existente
 Ejecuta `supabase/schema-update-fase1.sql` en SQL Editor y sube el nuevo `index.html`.
+
+## Novedades Fase 2
+
+- **Modo offline con cola**: si falla el internet, pedidos y movimientos se guardan en cola local y se sincronizan solos al volver (indicador "🔄 N pendientes")
+- **Roles**: admin / caja / cocina. El rol cocina solo ve la pestaña Cocina. Se asignan en la tabla `staff_roles` (email + role + nombre). Sin fila = admin
+- **Clientes**: escribe un teléfono conocido y autocompleta nombre y dirección
+- **Informes** (Control): ventas, ticket medio, top productos y ventas por día, con filtros de fecha y exportación a CSV
+- **Fichaje**: botón de entrada/salida del equipo con registro del día
+
+### Actualizar una instalación existente
+Ejecuta `supabase/schema-update-fase2.sql` en SQL Editor y sube el nuevo `index.html`.

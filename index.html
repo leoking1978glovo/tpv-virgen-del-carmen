@@ -258,7 +258,8 @@
 
         <div class="customer">
           <div class="field"><label>Nombre del cliente *</label><input type="text" id="c-name" placeholder="Ej. María García"></div>
-          <div class="field" id="f-phone"><label>Teléfono *</label><input type="tel" id="c-phone" placeholder="600 000 000"></div>
+          <div class="field" id="f-phone"><label>Teléfono *</label><input type="tel" id="c-phone" placeholder="600 000 000" list="phone-list"></div>
+          <datalist id="phone-list"></datalist>
           <div class="field full" id="f-addr" style="display:none"><label>Dirección de entrega *</label><input type="text" id="c-addr" placeholder="Calle, número, piso"></div>
           <div class="field" id="f-pickup"><label>🕐 Hora de recogida</label><select id="c-pickup"></select></div>
           <div class="field" id="f-driver" style="display:none"><label>🛵 Repartidor</label><select id="c-driver"></select></div>
@@ -363,6 +364,19 @@
           </div>
         </div>
 
+        <div class="drivers-card" id="rep-card">
+          <h3>📈 Informes de ventas</h3>
+          <div class="driver-add" style="flex-wrap:wrap">
+            <input type="date" id="rep-from">
+            <input type="date" id="rep-to">
+            <button class="btn btn-red" id="btn-rep-csv">⬇️ Exportar CSV</button>
+          </div>
+          <div id="rep-body" style="margin-top:12px"></div>
+        </div>
+        <div class="drivers-card">
+          <h3>🕐 Fichaje del equipo</h3>
+          <div id="fichaje-body"></div>
+        </div>
         <div class="drivers-card">
           <h3>🍗 Carta · productos y precios</h3>
           <p style="font-size:12px;color:var(--ink2);margin-bottom:10px">Edita precios al instante y añade productos. Los cambios se aplican en todos los dispositivos.</p>
@@ -641,9 +655,17 @@ async function dbLoadAll(){
     state.arqueos = aq.data ? aq.data.map(a=>({ fecha:new Date(a.closed_at).getTime(),
       esperado:+a.esperado, contado:+a.contado, dif:+a.dif })) : [];
   }catch(e){ state.arqueos=[]; }
+  try{
+    const t0=new Date(); t0.setHours(0,0,0,0);
+    const tc=await sb.from('time_clock').select('*').gte('at',t0.toISOString()).order('at',{ascending:false}).limit(50);
+    state.fichajes = tc.data ? tc.data.map(f=>({ action:f.action, name:f.name, at:f.at })) : [];
+  }catch(e){ state.fichajes=[]; }
+  CLIENTS={};
+  state.pedidos.forEach(p=>{ if(p.phone) CLIENTS[p.phone]={ name:p.name, addr:p.addr||'' }; });
+  renderPhoneList();
 }
 
-async function dbUpsertOrder(p){
+async function dbUpsertOrderRaw(p){
   if(!sb) return p.id;
   const row={ type:p.type, status:p.status, name:p.name, phone:p.phone, addr:p.addr,
     pickup:p.pickup, driver:p.driver, notes:p.notes, total:p.total, paid:p.paid,
@@ -655,7 +677,7 @@ async function dbUpsertOrder(p){
     const { data, error } = await sb.from('orders')
       .insert(Object.assign({}, row, { created_at:new Date(p.t).toISOString() }))
       .select().single();
-    if(error){ toast('⚠️ Error guardando el pedido'); return p.id; }
+    if(error) throw error;
     p.id = data.id; p._inDb = true;
   }
   if(p.items.length){
@@ -665,10 +687,21 @@ async function dbUpsertOrder(p){
   return p.id;
 }
 
+async function dbAddMovementRaw(tipo, metodo, importe, nota, sessionId){
+  if(!sb) return;
+  const sid=sessionId||state.caja.dbId;
+  if(!sid) return;
+  const { error } = await sb.from('cash_movements')
+    .insert({ session_id:sid, tipo, metodo, importe, nota:nota||'' });
+  if(error) throw error;
+}
+async function dbUpsertOrder(p){
+  try{ await dbUpsertOrderRaw(p); }
+  catch(e){ outboxAdd({ t:'order', p:JSON.parse(JSON.stringify(p)) }); }
+}
 async function dbAddMovement(tipo, metodo, importe, nota){
-  if(!sb || !state.caja.dbId) return;
-  await sb.from('cash_movements')
-    .insert({ session_id:state.caja.dbId, tipo, metodo, importe, nota:nota||'' });
+  try{ await dbAddMovementRaw(tipo, metodo, importe, nota); }
+  catch(e){ outboxAdd({ t:'mov', p:{ tipo, metodo, importe, nota, sessionId:state.caja.dbId } }); }
 }
 
 function startRealtime(){
@@ -685,6 +718,77 @@ function startRealtime(){
     .subscribe();
 }
 
+
+/* ================= OUTBOX (cola offline) ================= */
+const OUTBOX_KEY='tpv_outbox_v1';
+function outboxCount(){ try{ return JSON.parse(localStorage.getItem(OUTBOX_KEY)||'[]').length; }catch(e){ return 0; } }
+function outboxAdd(op){
+  try{
+    const q=JSON.parse(localStorage.getItem(OUTBOX_KEY)||'[]');
+    q.push(op); localStorage.setItem(OUTBOX_KEY, JSON.stringify(q));
+  }catch(e){}
+  updateSyncBadge();
+}
+function outboxRemoveFirst(){
+  const q=JSON.parse(localStorage.getItem(OUTBOX_KEY)||'[]');
+  q.shift(); localStorage.setItem(OUTBOX_KEY, JSON.stringify(q));
+  updateSyncBadge();
+}
+async function outboxFlush(){
+  if(!sb) return;
+  let guard=0;
+  while(outboxCount()>0 && guard<20){
+    guard++;
+    const q=JSON.parse(localStorage.getItem(OUTBOX_KEY)||'[]');
+    if(!q.length) break;
+    const op=q[0];
+    try{
+      if(op.t==='order') await dbUpsertOrderRaw(op.p);
+      else if(op.t==='mov') await dbAddMovementRaw(op.p.tipo, op.p.metodo, op.p.importe, op.p.nota, op.p.sessionId);
+      outboxRemoveFirst();
+    }catch(e){ break; }
+  }
+}
+function updateSyncBadge(){
+  const n=outboxCount();
+  let el=document.getElementById('sync-badge');
+  if(n>0){
+    if(!el){
+      el=document.createElement('span');
+      el.id='sync-badge';
+      el.style.cssText='background:#b45309;color:#fff;font-size:10px;padding:2px 8px;border-radius:99px;font-weight:700;margin-left:6px;align-self:center';
+      const nav=document.querySelector('nav.tabs');
+      if(nav) nav.appendChild(el);
+    }
+    el.textContent='🔄 '+n+' pendiente'+(n>1?'s':'');
+  } else if(el){ el.remove(); }
+}
+
+/* ================= ROLES ================= */
+let USER={ email:'', role:'admin', name:'' };
+let CLIENTS={};
+const ROLE_TABS={ admin:['nuevo','pedidos','kds','caja','control'], caja:['nuevo','pedidos','kds','caja','control'], cocina:['kds'] };
+let currentPage='nuevo';
+async function loadUserRole(){
+  if(!sb){ USER={email:'',role:'admin',name:'Jefe'}; return; }
+  try{
+    const { data:{ user } } = await sb.auth.getUser();
+    USER.email=user?user.email:'';
+    const { data } = await sb.from('staff_roles').select('*').eq('email',USER.email).maybeSingle();
+    USER.role=(data&&data.role)?data.role:'admin';
+    USER.name=(data&&data.name)?data.name:USER.email.split('@')[0];
+  }catch(e){ USER.role='admin'; }
+  applyRoleUI();
+}
+function applyRoleUI(){
+  const allowed=ROLE_TABS[USER.role]||ROLE_TABS.admin;
+  document.querySelectorAll('nav.tabs button').forEach(b=>{
+    b.style.display = allowed.includes(b.dataset.page)?'':'none';
+  });
+  if(!allowed.includes(currentPage)){
+    document.querySelector('nav.tabs button[data-page="'+allowed[0]+'"]').click();
+  }
+}
 
 /* ================= CONFIG ================= */
 let CONFIG = { businessName:'Asador de Pollos Virgen del Carmen', businessAddr:'',
@@ -789,14 +893,98 @@ function showLocalBanner(){
   document.body.appendChild(b);
 }
 
+
+/* ================= CLIENTES (autocompletado) ================= */
+function renderPhoneList(){
+  const dl=document.getElementById('phone-list'); if(!dl) return;
+  dl.innerHTML=Object.keys(CLIENTS).map(t=>'<option value="'+t+'">'+esc(CLIENTS[t].name)+'</option>').join('');
+}
+document.getElementById('c-phone').addEventListener('input',e=>{
+  const c=CLIENTS[e.target.value.trim()];
+  if(c){
+    document.getElementById('c-name').value=c.name;
+    if(orderType==='domicilio'&&c.addr) document.getElementById('c-addr').value=c.addr;
+    toast('👤 Cliente encontrado: '+c.name);
+  }
+});
+
+/* ================= INFORMES ================= */
+function computeInforme(){
+  const from=document.getElementById('rep-from').value;
+  const to=document.getElementById('rep-to').value;
+  let list=state.pedidos.filter(p=>p.status==='entregado'&&p.paid);
+  if(from) list=list.filter(p=>p.t>=new Date(from+'T00:00:00').getTime());
+  if(to) list=list.filter(p=>p.t<=new Date(to+'T23:59:59').getTime());
+  const total=list.reduce((s,p)=>s+p.total,0);
+  const prodMap={};
+  list.forEach(p=>p.items.forEach(i=>{ prodMap[i.name]=(prodMap[i.name]||0)+i.qty; }));
+  const top=Object.entries(prodMap).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const byDay={};
+  list.forEach(p=>{ const d=new Date(p.t).toLocaleDateString('es-ES'); byDay[d]=(byDay[d]||0)+p.total; });
+  return { list, total, avg:list.length?total/list.length:0, top, byDay };
+}
+function renderInformes(){
+  const el=document.getElementById('rep-body'); if(!el) return;
+  if(!document.getElementById('rep-from').value){
+    const d=new Date(); d.setDate(d.getDate()-6);
+    document.getElementById('rep-from').value=d.toISOString().slice(0,10);
+    document.getElementById('rep-to').value=new Date().toISOString().slice(0,10);
+  }
+  const r=computeInforme();
+  el.innerHTML=
+    '<div class="stats" style="margin-bottom:10px">'+
+    '<div class="stat"><div class="sl">Ventas</div><div class="sv">'+fmt(r.total)+'</div></div>'+
+    '<div class="stat"><div class="sl">Pedidos</div><div class="sv">'+r.list.length+'</div></div>'+
+    '<div class="stat"><div class="sl">Ticket medio</div><div class="sv">'+fmt(r.avg)+'</div></div></div>'+
+    (r.top.length?'<div class="cat-title">TOP PRODUCTOS</div>'+r.top.map(t=>'<div class="driver-row"><span class="dn">'+esc(t[0])+'</span><b>'+t[1]+' uds</b></div>').join(''):'')+
+    (Object.keys(r.byDay).length?'<div class="cat-title">VENTAS POR DÍA</div>'+Object.entries(r.byDay).map(d=>'<div class="driver-row"><span class="dn">'+d[0]+'</span><b>'+fmt(d[1])+'</b></div>').join(''):'<div style="font-size:13px;color:var(--ink2);padding:6px 0">Sin ventas en este rango.</div>');
+}
+document.getElementById('rep-from').addEventListener('change',renderInformes);
+document.getElementById('rep-to').addEventListener('change',renderInformes);
+document.getElementById('btn-rep-csv').addEventListener('click',()=>{
+  const r=computeInforme();
+  const rows=['ID;Fecha;Tipo;Cliente;Telefono;Total'];
+  r.list.forEach(p=>rows.push([p.id,new Date(p.t).toLocaleString('es-ES'),p.type,'"'+(p.name||'')+'"',p.phone||'',p.total.toFixed(2).replace('.',',')].join(';')));
+  const blob=new Blob(['\ufeff'+rows.join('\n')],{type:'text/csv'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='ventas.csv'; a.click();
+  toast('⬇️ CSV descargado');
+});
+
+/* ================= FICHAJE ================= */
+async function fichar(){
+  if(!sb){ toast('⚠️ Necesitas conexión para fichar'); return; }
+  const last=state.fichajes&&state.fichajes[0];
+  const action=(last&&last.action==='in')?'out':'in';
+  try{
+    await sb.from('time_clock').insert({ email:USER.email, name:USER.name, action });
+    toast(action==='in'?'🕐 Entrada registrada':'🕐 Salida registrada');
+    await dbLoadAll(); renderAll();
+  }catch(e){ toast('⚠️ Error al fichar'); }
+}
+function renderFichaje(){
+  const el=document.getElementById('fichaje-body'); if(!el) return;
+  const last=state.fichajes&&state.fichajes[0];
+  const inside=last&&last.action==='in';
+  const hoy=new Date().toLocaleDateString('es-ES');
+  const hoyRegs=(state.fichajes||[]).filter(f=>new Date(f.at).toLocaleDateString('es-ES')===hoy);
+  el.innerHTML='<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">'+
+    '<button class="btn '+(inside?'btn-red':'btn-green')+'" id="btn-fichar">'+(inside?'🕐 Fichar SALIDA':'🕐 Fichar ENTRADA')+'</button>'+
+    '<span style="font-size:13px;color:var(--ink2)">'+esc(USER.name||'')+' · '+(inside?'Dentro del turno':'Fuera de turno')+'</span></div>'+
+    (hoyRegs.length?'<div class="cat-title">HOY</div>'+hoyRegs.slice().reverse().map(f=>'<div class="driver-row"><span>'+(f.action==='in'?'🟢 Entrada':'🔴 Salida')+'</span><span class="dn">'+esc(f.name)+'</span><b>'+new Date(f.at).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})+'</b></div>').join(''):'');
+  const b=document.getElementById('btn-fichar'); if(b) b.onclick=fichar;
+}
+
 async function initApp(){
   tick(); renderPickupSlots(); applyTypeUI();
   if(!sb) showLocalBanner();
   const authed = await initAuth();
   if(!authed) return;
-  if(sb){ await dbLoadAll(); startRealtime(); }
+  await loadUserRole();
+  if(sb){ await dbLoadAll(); startRealtime(); await outboxFlush(); }
   else { seed(); document.getElementById('login-gate').style.display='none'; }
   await loadSettings();
+  window.addEventListener('online', ()=>{ outboxFlush(); toast('🌐 Conexión recuperada'); });
+  window.addEventListener('offline', ()=>{ toast('📴 SIN INTERNET — los cambios se guardarán en cola'); });
   renderAll();
 }
 
@@ -1272,6 +1460,9 @@ document.getElementById('ped-filter').addEventListener('click',e=>{
 });
 document.querySelector('nav.tabs').addEventListener('click',e=>{
   const b=e.target.closest('button'); if(!b) return;
+  const allowed=ROLE_TABS[USER.role]||ROLE_TABS.admin;
+  if(!allowed.includes(b.dataset.page)){ toast('⛔ Tu rol ('+USER.role+') no tiene acceso ahí'); return; }
+  currentPage=b.dataset.page;
   document.querySelectorAll('nav.tabs button').forEach(x=>x.classList.toggle('active',x===b));
   document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id==='page-'+b.dataset.page));
   document.getElementById('cart-panel').classList.remove('open');
@@ -1406,7 +1597,7 @@ document.getElementById('aq-confirm').onclick=async ()=>{
 
 /* ================= INIT ================= */
 function renderAll(){
-  ['renderArqueos','renderCartaAdmin','renderCart','renderQuick','renderPedidos','renderKds','renderControl','renderCaja','renderDriverSelects']
+  ['renderArqueos','renderCartaAdmin','renderCart','renderQuick','renderPedidos','renderKds','renderControl','renderInformes','renderFichaje','renderCaja','renderDriverSelects']
     .forEach(fn=>{ try{ window[fn](); }catch(e){ console.error('Error en '+fn+':', e); } });
   try{ renderCatalog(document.getElementById('prod-search').value); }catch(e){ console.error('Error en renderCatalog:', e); }
 }
