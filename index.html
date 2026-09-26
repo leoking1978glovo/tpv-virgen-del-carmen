@@ -176,7 +176,7 @@
   .toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 
   .ped-card.st-cancelado{border-left-color:#bbb;opacity:.55}
-.ped-mini{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:8px;box-shadow:var(--shadow);font-size:13px}
+.ped-mini{grid-column:1/-1;display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px 14px;margin-bottom:8px;box-shadow:var(--shadow);font-size:13px}
 .ped-mini .pm-id{font-weight:800;white-space:nowrap}
 .ped-mini .pm-who{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ped-mini .pm-meta{color:var(--ink2);white-space:nowrap;font-size:12px}
@@ -1133,7 +1133,6 @@ function renderPedidos(){
           <span class="pm-id">${orderLabel(p)}</span>
           <span class="pm-who"><b>${p.name}</b>${p.phone?' · '+p.phone:''}</span>
           <span class="pm-meta">${p.items.reduce((s,i)=>s+i.qty,0)} art · hace ${mins} min</span>
-          <span class="chip ${STATUS[p.status].chip}">${STATUS[p.status].label}</span>
           <span class="pm-total">${fmt(p.total)}</span>
           <button class="btn btn-ghost" data-print="${p.id}" title="Reimprimir ticket">🖨️</button>
         </div>`;}).join('')
