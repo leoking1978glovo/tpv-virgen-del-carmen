@@ -778,8 +778,18 @@ document.getElementById('btn-np').onclick=async ()=>{
   renderAll(); toast('🍗 '+name+' añadido a la carta');
 };
 
+function showLocalBanner(){
+  if(document.getElementById('local-banner')) return;
+  const b=document.createElement('div');
+  b.id='local-banner';
+  b.style.cssText='position:fixed;top:0;left:0;right:0;z-index:300;background:#c0392b;color:#fff;text-align:center;padding:8px 14px;font-size:13px;font-weight:800;box-shadow:0 2px 10px rgba(0,0,0,.3)';
+  b.textContent='⚠️ MODO LOCAL — los datos NO se están guardando. Revisa las credenciales de Supabase o la conexión a internet.';
+  document.body.appendChild(b);
+}
+
 async function initApp(){
   tick(); renderPickupSlots(); applyTypeUI();
+  if(!sb) showLocalBanner();
   const authed = await initAuth();
   if(!authed) return;
   if(sb){ await dbLoadAll(); startRealtime(); }
@@ -976,8 +986,10 @@ async function advance(id){
 
 function loadForEdit(id){
   const p=state.pedidos.find(x=>x.id===id); if(!p) return;
-  cart=JSON.parse(JSON.stringify(p.items));
+  cartsByType[orderType]=cart;
   orderType=p.type; editingId=id;
+  cart=JSON.parse(JSON.stringify(p.items));
+  cartsByType[orderType]=[];
   document.getElementById('c-name').value=p.name;
   document.getElementById('c-phone').value=p.phone;
   document.getElementById('c-addr').value=p.addr;
@@ -1053,9 +1065,15 @@ function applyTypeUI(){
   document.getElementById('f-driver').style.display = orderType==='domicilio'?'block':'none';
   document.getElementById('f-pickup').style.display = orderType==='mostrador'?'none':'block';
 }
+let cartsByType={recogida:[],domicilio:[],mostrador:[]};
 document.getElementById('order-type').addEventListener('click',e=>{
   const b=e.target.closest('.otype'); if(!b) return;
-  orderType=b.dataset.ot; applyTypeUI(); renderCart();
+  const nt=b.dataset.ot;
+  if(nt===orderType) return;
+  cartsByType[orderType]=cart;
+  orderType=nt;
+  cart=cartsByType[orderType]||[];
+  applyTypeUI(); renderCart();
 });
 
 /* ================= CREATE ORDER ================= */
@@ -1088,7 +1106,7 @@ function createOrUpdate(status){
   return p;
 }
 function resetForm(){
-  cart=[]; editingId=null;
+  cart=[]; cartsByType[orderType]=[]; editingId=null;
   ['c-name','c-phone','c-addr','o-notes'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('c-pickup').selectedIndex=0;
   document.getElementById('c-driver').selectedIndex=0;
@@ -1365,7 +1383,8 @@ document.getElementById('aq-confirm').onclick=async ()=>{
 };
 
 /* ================= INIT ================= */
-function renderAll(){ renderArqueos(); renderCartaAdmin(); renderCart(); renderCatalog(document.getElementById('prod-search').value); renderQuick(); renderPedidos(); renderKds(); renderControl(); renderCaja(); renderDriverSelects(); initApp();
+function renderAll(){ renderArqueos(); renderCartaAdmin(); renderCart(); renderCatalog(document.getElementById('prod-search').value); renderQuick(); renderPedidos(); renderKds(); renderControl(); renderCaja(); renderDriverSelects(); }
+initApp();
 </script>
 </body>
 </html>
