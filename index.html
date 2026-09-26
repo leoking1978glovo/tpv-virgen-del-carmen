@@ -338,13 +338,14 @@
             <button class="btn btn-dark btn-big" id="btn-arqueo" style="margin-top:16px">📋 Cierre y arqueo de caja</button>
           </div>
         </div>
-      </div>
-
+      
         <div class="drivers-card">
           <h3>📋 Arqueos anteriores</h3>
           <div id="arqueo-list"></div>
         </div>
+      </div>
 
+        
       <!-- CONTROL -->
       <div class="page" id="page-control">
         <div class="stats">
@@ -871,7 +872,7 @@ let ALL_PRODS = CATEGORIES.flatMap(cc=>cc.items);
 function renderCatalog(filter=''){
   const f=filter.toLowerCase();
   document.getElementById('catalog').innerHTML = CATEGORIES.map(c=>{
-    const items=c.items.filter(p=>p.name.toLowerCase().includes(f));
+    const items=c.items.filter(p=>(p.name||'').toLowerCase().includes(f));
     if(!items.length) return '';
     return `<div class="cat-title">${c.name}</div>
     <div class="prod-grid">${items.map(p=>{
@@ -987,6 +988,7 @@ async function advance(id){
 
 function loadForEdit(id){
   const p=state.pedidos.find(x=>x.id===id); if(!p) return;
+  saveForm();
   cartsByType[orderType]=cart;
   orderType=p.type; editingId=id;
   cart=JSON.parse(JSON.stringify(p.items));
@@ -1067,13 +1069,31 @@ function applyTypeUI(){
   document.getElementById('f-pickup').style.display = orderType==='mostrador'?'none':'block';
 }
 let cartsByType={recogida:[],domicilio:[],mostrador:[]};
+let formByType={recogida:{},domicilio:{},mostrador:{}};
+function saveForm(){
+  formByType[orderType]={ n:document.getElementById('c-name').value,
+    p:document.getElementById('c-phone').value, a:document.getElementById('c-addr').value,
+    k:document.getElementById('c-pickup').value, d:document.getElementById('c-driver').value,
+    o:document.getElementById('o-notes').value };
+}
+function restoreForm(){
+  const f=formByType[orderType]||{};
+  document.getElementById('c-name').value=f.n||'';
+  document.getElementById('c-phone').value=f.p||'';
+  document.getElementById('c-addr').value=f.a||'';
+  document.getElementById('c-pickup').value=f.k||'Lo antes posible';
+  document.getElementById('c-driver').value=f.d||'';
+  document.getElementById('o-notes').value=f.o||'';
+}
 document.getElementById('order-type').addEventListener('click',e=>{
   const b=e.target.closest('.otype'); if(!b) return;
   const nt=b.dataset.ot;
   if(nt===orderType) return;
+  saveForm();
   cartsByType[orderType]=cart;
   orderType=nt;
   cart=cartsByType[orderType]||[];
+  restoreForm();
   applyTypeUI(); renderCart();
 });
 
@@ -1107,7 +1127,8 @@ function createOrUpdate(status){
   return p;
 }
 function resetForm(){
-  cart=[]; cartsByType[orderType]=[]; editingId=null;
+  cart=[]; cartsByType[orderType]=[]; formByType[orderType]={}; editingId=null;
+  restoreForm();
   ['c-name','c-phone','c-addr','o-notes'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('c-pickup').selectedIndex=0;
   document.getElementById('c-driver').selectedIndex=0;
@@ -1384,7 +1405,11 @@ document.getElementById('aq-confirm').onclick=async ()=>{
 };
 
 /* ================= INIT ================= */
-function renderAll(){ renderArqueos(); renderCartaAdmin(); renderCart(); renderCatalog(document.getElementById('prod-search').value); renderQuick(); renderPedidos(); renderKds(); renderControl(); renderCaja(); renderDriverSelects(); }
+function renderAll(){
+  ['renderArqueos','renderCartaAdmin','renderCart','renderQuick','renderPedidos','renderKds','renderControl','renderCaja','renderDriverSelects']
+    .forEach(fn=>{ try{ window[fn](); }catch(e){ console.error('Error en '+fn+':', e); } });
+  try{ renderCatalog(document.getElementById('prod-search').value); }catch(e){ console.error('Error en renderCatalog:', e); }
+}
 initApp();
 </script>
 </body>
