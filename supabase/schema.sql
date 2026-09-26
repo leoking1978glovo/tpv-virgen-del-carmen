@@ -91,6 +91,8 @@ create table if not exists cash_arqueos (
   ventas_total numeric(10,2) default 0
 );
 
+alter table products add column if not exists stock int;
+
 create table if not exists settings (
   key text primary key,
   value text

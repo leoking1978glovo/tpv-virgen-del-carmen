@@ -209,6 +209,12 @@
   }
 </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="theme-color" content="#7a1d0e">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="apple-touch-icon" href="icon-192.png">
 </head>
 <body>
 
@@ -593,7 +599,7 @@ function rebuildCatalog(prods){
   const cats=[], map={};
   prods.forEach(p=>{
     if(!map[p.category]){ map[p.category]=[]; cats.push(p.category); }
-    map[p.category].push({ name:p.name, price:+p.price, dbId:p.id });
+    map[p.category].push({ name:p.name, price:+p.price, dbId:p.id, stock:(p.stock===null||p.stock===undefined)?null:+p.stock });
   });
   CATEGORIES.length=0;
   cats.forEach(c=>CATEGORIES.push({ name:c, items:map[c] }));
@@ -857,13 +863,16 @@ function renderCartaAdmin(){
     c.items.map((p,pi)=>'<div class="driver-row"><span class="dn">'+p.name+'</span>'+
       '<input type="number" value="'+p.price+'" step="0.05" min="0" data-cp="'+ci+'-'+pi+'" style="width:92px;padding:8px;border:2px solid var(--line);border-radius:10px;font-weight:700">'+
       '<span style="font-size:12px;color:var(--ink2)">€</span>'+
+      '<input type="number" value="'+(p.stock===null?'':p.stock)+'" step="1" min="0" placeholder="Stock" data-st="'+ci+'-'+pi+'" style="width:80px;padding:8px;border:2px solid var(--line);border-radius:10px;font-weight:700">'+
       '<button class="btn btn-ghost" data-sv="'+ci+'-'+pi+'">💾</button></div>').join('')
   ).join('');
   el.querySelectorAll('[data-sv]').forEach(b=>b.onclick=async ()=>{
     const parts=b.dataset.sv.split('-'); const ci=+parts[0], pi=+parts[1];
     const price=parseFloat(el.querySelector('[data-cp="'+ci+'-'+pi+'"]').value)||0;
-    const p=CATEGORIES[ci].items[pi]; p.price=price;
-    if(sb && p.dbId) await sb.from('products').update({price}).eq('id',p.dbId);
+    const stRaw=el.querySelector('[data-st="'+ci+'-'+pi+'"]').value;
+    const stock=stRaw===''?null:Math.max(0,parseInt(stRaw)||0);
+    const p=CATEGORIES[ci].items[pi]; p.price=price; p.stock=stock;
+    if(sb && p.dbId) await sb.from('products').update({price, stock}).eq('id',p.dbId);
     renderAll(); toast('💾 '+p.name+' → '+fmt(price));
   });
 }
@@ -1065,10 +1074,14 @@ function renderCatalog(filter=''){
     return `<div class="cat-title">${c.name}</div>
     <div class="prod-grid">${items.map(p=>{
       const gi=ALL_PRODS.indexOf(p);
-      return `<button class="prod" data-g="${gi}"><div class="pn">${p.name}</div><div class="pp">${fmt(p.price)}</div></button>`;}).join('')}</div>`;
+      const stockTxt = p.stock===null ? '' : (p.stock<=0 ? '<div style="color:#c0392b;font-weight:800;font-size:11px;margin-top:4px">AGOTADO</div>' : (p.stock<=5 ? '<div style="color:#b45309;font-weight:700;font-size:11px;margin-top:4px">Quedan '+p.stock+'</div>' : ''));
+      return `<button class="prod" data-g="${gi}"><div class="pn">${p.name}</div><div class="pp">${fmt(p.price)}</div>${stockTxt}</button>`;}).join('')}</div>`;
   }).join('');
   document.querySelectorAll('.prod').forEach(b=>b.onclick=()=>{
     const p=ALL_PRODS[+b.dataset.g];
+    if(p.stock!==null && p.stock<=0){ toast('⚠️ '+p.name+' agotado'); return; }
+    const inCart=cart.filter(i=>i.name===p.name).reduce((s,i)=>s+i.qty,0);
+    if(p.stock!==null && inCart+1>p.stock){ toast('⚠️ Solo quedan '+p.stock+' de '+p.name); return; }
     const ex=cart.find(i=>i.name===p.name);
     if(ex) ex.qty++; else cart.push({name:p.name, price:p.price, qty:1});
     renderCart(); toast(`✓ ${p.name}`);
@@ -1325,6 +1338,13 @@ function resetForm(){
 document.getElementById('btn-send').onclick=async ()=>{
   const p=createOrUpdate('cocina'); if(!p) return;
   await dbUpsertOrder(p);
+  p.items.forEach(it=>{
+    const prod=ALL_PRODS.find(x=>x.name===it.name);
+    if(prod && prod.stock!==null){
+      prod.stock=Math.max(0, prod.stock-it.qty);
+      if(sb && prod.dbId) sb.from('products').update({stock:prod.stock}).eq('id',prod.dbId).then(()=>{});
+    }
+  });
   if(CONFIG.autoPrintKitchen==='1') printKitchenOrder(p);
   resetForm(); renderAll();
   toast(`👨‍🍳 Pedido #${p.id} enviado a cocina`);
@@ -1602,6 +1622,7 @@ function renderAll(){
   try{ renderCatalog(document.getElementById('prod-search').value); }catch(e){ console.error('Error en renderCatalog:', e); }
 }
 initApp();
+if('serviceWorker' in navigator){ window.addEventListener('load', ()=>{ navigator.serviceWorker.register('sw.js').catch(()=>{}); }); }
 </script>
 </body>
 </html>

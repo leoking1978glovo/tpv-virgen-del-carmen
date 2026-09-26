@@ -1,4 +1,4 @@
-# TPV · Asador de Pollos Virgen del Carmen (v2 + Fase 1 + Fase 2)
+# TPV · Asador de Pollos Virgen del Carmen (v2 + Fase 1 + Fase 2 + Fase 3)
 
 TPV web para comida para llevar con **base de datos real (Supabase)**:
 login de empleados, datos persistentes, sincronización en tiempo real entre
@@ -67,3 +67,21 @@ Ejecuta `supabase/schema-update-fase1.sql` en SQL Editor y sube el nuevo `index.
 
 ### Actualizar una instalación existente
 Ejecuta `supabase/schema-update-fase2.sql` en SQL Editor y sube el nuevo `index.html`.
+
+## Novedades Fase 3
+
+- **PWA instalable**: instala el TPV como app en tablet/móvil (icono propio, pantalla completa). Chrome/Edge: menú ⋮ → "Instalar app" o "Añadir a pantalla de inicio"
+- **Arranque sin internet**: el service worker cachea la app; combinado con la cola offline de la Fase 2, el TPV aguanta cortes de conexión
+- **Stock básico**: columna `stock` en products (NULL = sin control). Editable en Control → Carta. La tarjeta avisa "Quedan X" (≤5) o "AGOTADO" (0), bloquea añadir más de lo disponible y descuenta al enviar a cocina
+
+### Actualizar una instalación existente
+Ejecuta `supabase/schema-update-fase3.sql` y sube `index.html`, `manifest.webmanifest`, `sw.js`, `icon-192.png`, `icon-512.png`.
+
+### Dominio propio (opcional)
+Vercel → proyecto → Settings → Domains → añade `tpv.tudominio.es` y sigue las instrucciones DNS (registro A/CNAME). HTTPS automático gratis.
+
+### Impresión térmica directa (opcional, estándar hostelería)
+El diálogo de imprimir del navegador sirve para empezar. Para imprimir sin diálogo en impresoras ESC/POS por red/USB:
+1. Instala **QZ Tray** (gratis, qz.io) en el PC de la caja
+2. Lanza Chrome con `--kiosk-printing` para tickets silenciosos con la impresora por defecto
+3. (Avanzado) Integración RAW con QZ Tray vía websockets — consultar cuando se necesite
