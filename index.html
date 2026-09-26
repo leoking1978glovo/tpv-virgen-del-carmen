@@ -537,8 +537,8 @@ let state = {
 /* ================= SUPABASE v2 =================
    Configura tus credenciales abajo. Si dejas el placeholder,
    la app funciona 100% en local (modo demo, sin guardar). */
-const SUPABASE_URL = 'https://TU_PROYECTO.supabase.co';
-const SUPABASE_ANON_KEY = 'TU_ANON_KEY';
+const SUPABASE_URL = 'https://yizpwmjkutzvdncsxywq.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_qke6Jlm_Xjco_OdVqBWlpA_IiBX4srK';
 let sb = null;
 try {
   if (window.supabase && SUPABASE_URL.indexOf('TU_PROYECTO') === -1) {
@@ -976,10 +976,8 @@ async function advance(id){
 
 function loadForEdit(id){
   const p=state.pedidos.find(x=>x.id===id); if(!p) return;
-  cartsByType[orderType]=cart;
-  orderType=p.type; editingId=id;
   cart=JSON.parse(JSON.stringify(p.items));
-  cartsByType[orderType]=[];
+  orderType=p.type; editingId=id;
   document.getElementById('c-name').value=p.name;
   document.getElementById('c-phone').value=p.phone;
   document.getElementById('c-addr').value=p.addr;
@@ -1055,15 +1053,9 @@ function applyTypeUI(){
   document.getElementById('f-driver').style.display = orderType==='domicilio'?'block':'none';
   document.getElementById('f-pickup').style.display = orderType==='mostrador'?'none':'block';
 }
-let cartsByType={recogida:[],domicilio:[],mostrador:[]};
 document.getElementById('order-type').addEventListener('click',e=>{
   const b=e.target.closest('.otype'); if(!b) return;
-  const nt=b.dataset.ot;
-  if(nt===orderType) return;
-  cartsByType[orderType]=cart;
-  orderType=nt;
-  cart=cartsByType[orderType]||[];
-  applyTypeUI(); renderCart();
+  orderType=b.dataset.ot; applyTypeUI(); renderCart();
 });
 
 /* ================= CREATE ORDER ================= */
@@ -1096,7 +1088,7 @@ function createOrUpdate(status){
   return p;
 }
 function resetForm(){
-  cart=[]; cartsByType[orderType]=[]; editingId=null;
+  cart=[]; editingId=null;
   ['c-name','c-phone','c-addr','o-notes'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('c-pickup').selectedIndex=0;
   document.getElementById('c-driver').selectedIndex=0;
@@ -1373,8 +1365,7 @@ document.getElementById('aq-confirm').onclick=async ()=>{
 };
 
 /* ================= INIT ================= */
-function renderAll(){ renderArqueos(); renderCartaAdmin(); renderCart(); renderCatalog(document.getElementById('prod-search').value); renderQuick(); renderPedidos(); renderKds(); renderControl(); renderCaja(); renderDriverSelects(); }
-initApp();
+function renderAll(){ renderArqueos(); renderCartaAdmin(); renderCart(); renderCatalog(document.getElementById('prod-search').value); renderQuick(); renderPedidos(); renderKds(); renderControl(); renderCaja(); renderDriverSelects(); initApp();
 </script>
 </body>
 </html>
