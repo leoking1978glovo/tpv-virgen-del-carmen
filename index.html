@@ -976,8 +976,10 @@ async function advance(id){
 
 function loadForEdit(id){
   const p=state.pedidos.find(x=>x.id===id); if(!p) return;
-  cart=JSON.parse(JSON.stringify(p.items));
+  cartsByType[orderType]=cart;
   orderType=p.type; editingId=id;
+  cart=JSON.parse(JSON.stringify(p.items));
+  cartsByType[orderType]=[];
   document.getElementById('c-name').value=p.name;
   document.getElementById('c-phone').value=p.phone;
   document.getElementById('c-addr').value=p.addr;
@@ -1053,9 +1055,15 @@ function applyTypeUI(){
   document.getElementById('f-driver').style.display = orderType==='domicilio'?'block':'none';
   document.getElementById('f-pickup').style.display = orderType==='mostrador'?'none':'block';
 }
+let cartsByType={recogida:[],domicilio:[],mostrador:[]};
 document.getElementById('order-type').addEventListener('click',e=>{
   const b=e.target.closest('.otype'); if(!b) return;
-  orderType=b.dataset.ot; applyTypeUI(); renderCart();
+  const nt=b.dataset.ot;
+  if(nt===orderType) return;
+  cartsByType[orderType]=cart;
+  orderType=nt;
+  cart=cartsByType[orderType]||[];
+  applyTypeUI(); renderCart();
 });
 
 /* ================= CREATE ORDER ================= */
@@ -1088,7 +1096,7 @@ function createOrUpdate(status){
   return p;
 }
 function resetForm(){
-  cart=[]; editingId=null;
+  cart=[]; cartsByType[orderType]=[]; editingId=null;
   ['c-name','c-phone','c-addr','o-notes'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('c-pickup').selectedIndex=0;
   document.getElementById('c-driver').selectedIndex=0;
