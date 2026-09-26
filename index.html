@@ -285,7 +285,7 @@
           <input type="date" id="ped-to" title="Hasta fecha">
         </div>
         <div class="quick-btns" id="ped-filter">
-          <button class="quick active" data-f="todos">Todos</button>
+          <button class="quick active" data-f="todos">Activos</button>
           <button class="quick" data-f="nuevo">🟠 Nuevos</button>
           <button class="quick" data-f="cocina">🔵 En cocina</button>
           <button class="quick" data-f="listo">🟢 Listos</button>
@@ -1105,7 +1105,8 @@ function renderQuick(){
 let pedFilter='todos', pedSearch='', pedFrom='', pedTo='';
 const isActiveStatus=s=>s!=='entregado'&&s!=='cancelado';
 function renderPedidos(){
-  const list=state.pedidos.filter(p=>{
+  let list=state.pedidos.filter(p=>{
+    if(pedFilter==='todos' && p.status==='entregado') return false;
     if(pedFilter!=='todos' && p.status!==pedFilter) return false;
     if(pedSearch){
       const q=pedSearch.toLowerCase();
@@ -1115,9 +1116,10 @@ function renderPedidos(){
     if(pedTo && p.t > new Date(pedTo+'T23:59:59').getTime()) return false;
     return true;
   }).sort((a,b)=>b.t-a.t);
+  if(pedFilter==='entregado'||pedFilter==='cancelado') list=list.slice(0,50);
   document.getElementById('ped-badge').textContent = state.pedidos.filter(p=>isActiveStatus(p.status)).length;
   const el=document.getElementById('ped-list');
-  el.innerHTML = list.length? list.map(p=>{
+  el.innerHTML = list.length? ((pedFilter==='entregado'&&state.pedidos.filter(p=>p.status==='entregado').length>50)?'<div style="font-size:12px;color:var(--ink2);padding:6px 2px">Mostrando los 50 más recientes — usa el buscador para encontrar cualquiera.</div>':'')+list.map(p=>{
     const mins=Math.round((Date.now()-p.t)/60000);
     const active=isActiveStatus(p.status);
     return `<div class="ped-card st-${p.status}">
@@ -1144,7 +1146,7 @@ function renderPedidos(){
           ${active&&!p.paid?`<button class="btn btn-accent" data-pay="${p.id}">💶 Cobrar</button>`:''}
         </div>
       </div>
-    </div>`;}).join('') : '<div style="color:var(--ink2);padding:40px;text-align:center">No hay pedidos con estos filtros.</div>';
+    </div>`;}).join('') : ('<div style="color:var(--ink2);padding:40px;text-align:center">No hay pedidos con estos filtros.</div>');
   renderDriverSelects();
   el.querySelectorAll('[data-next]').forEach(b=>b.onclick=()=>advance(+b.dataset.next));
   el.querySelectorAll('[data-pay]').forEach(b=>b.onclick=()=>openPay(+b.dataset.pay));
