@@ -1074,7 +1074,7 @@ function renderCatalog(filter=''){
     return `<div class="cat-title">${c.name}</div>
     <div class="prod-grid">${items.map(p=>{
       const gi=ALL_PRODS.indexOf(p);
-      const stockTxt = p.stock===null ? '' : (p.stock<=0 ? '<div style="color:#c0392b;font-weight:800;font-size:11px;margin-top:4px">AGOTADO</div>' : (p.stock<=5 ? '<div style="color:#b45309;font-weight:700;font-size:11px;margin-top:4px">Quedan '+p.stock+'</div>' : ''));
+      const stockTxt = p.stock===null ? '' : (p.stock<=0 ? '<div style="color:#c0392b;font-weight:800;font-size:11px;margin-top:4px">AGOTADO</div>' : '<div style="color:'+(p.stock<=5?'#b45309;font-weight:800':'#7a6a62;font-weight:600')+';font-size:11px;margin-top:4px">Quedan '+p.stock+'</div>');
       return `<button class="prod" data-g="${gi}"><div class="pn">${p.name}</div><div class="pp">${fmt(p.price)}</div>${stockTxt}</button>`;}).join('')}</div>`;
   }).join('');
   document.querySelectorAll('.prod').forEach(b=>b.onclick=()=>{
