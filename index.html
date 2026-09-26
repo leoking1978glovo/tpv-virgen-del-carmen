@@ -583,6 +583,7 @@ function rebuildCatalog(prods){
   CATEGORIES.length=0;
   cats.forEach(c=>CATEGORIES.push({ name:c, items:map[c] }));
   if(!CATEGORIES.length) CATEGORIES.push({ name:'General', items:[] });
+  ALL_PRODS = CATEGORIES.flatMap(cc=>cc.items);
 }
 
 async function dbLoadAll(){
@@ -866,7 +867,7 @@ function renderCart(){
 }
 
 /* ================= RENDER: CATALOG ================= */
-const ALL_PRODS = CATEGORIES.flatMap(cc=>cc.items);
+let ALL_PRODS = CATEGORIES.flatMap(cc=>cc.items);
 function renderCatalog(filter=''){
   const f=filter.toLowerCase();
   document.getElementById('catalog').innerHTML = CATEGORIES.map(c=>{
