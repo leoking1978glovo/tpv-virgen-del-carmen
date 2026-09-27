@@ -95,3 +95,15 @@ El diálogo de imprimir del navegador sirve para empezar. Para imprimir sin diá
 
 ### Actualizar una instalación existente
 Ejecuta `supabase/schema-update-faseA-qm.sql` y sube el nuevo `index.html`.
+
+## Fase B (Qamarero): caja seria
+
+- **Arqueo parcial (X)**: cuenta la caja sin cerrarla — guarda el arqueo, imprime su ticket y reinicia contadores para la siguiente jornada (la caja sigue abierta)
+- **Cerrar arqueo y jornada (Z)**: cierra la caja con ticket de jornada que incluye las ventas acumuladas del día
+- **🙈 Arqueo ciego** (Configuración): oculta el efectivo esperado para que el empleado cuente sin trampas
+- **Propina** guardada en cada pedido (visible en el histórico y en el CSV)
+- **Suplemento de domicilio** (Configuración): importe fijo que se suma automático a los pedidos de domicilio
+- **Repartidor** visible en las filas del histórico
+
+### Actualizar una instalación existente
+Ejecuta `supabase/schema-update-faseB-qm.sql` y sube el nuevo `index.html`.

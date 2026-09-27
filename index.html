@@ -422,6 +422,8 @@
             <input type="text" id="cfg-footer" placeholder="Texto del pie de ticket" style="flex:2;min-width:180px">
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap"><input type="checkbox" id="cfg-autoprint"> Imprimir comanda al enviar a cocina</label>
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap"><input type="checkbox" id="cfg-sound"> 🔊 Sonido al entrar pedido nuevo</label>
+            <input type="number" id="cfg-fee" placeholder="Suplemento domicilio €" step="0.1" min="0" style="max-width:160px">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap"><input type="checkbox" id="cfg-blind"> 🙈 Arqueo ciego</label>
             <button class="btn btn-red" id="btn-cfg">Guardar</button>
           </div>
         </div>
@@ -434,7 +436,8 @@
       <div class="cart-head">
         <h2 id="cart-title">Pedido · Recogida</h2>
         <div class="cmeta" id="cart-meta">Añade productos para empezar</div>
-        <div class="cart-total-row"><span style="font-size:13px;font-weight:600;color:var(--ink2)">Total</span><span class="cart-total" id="cart-total">0,00 €</span></div>
+        <div id="cart-fee" style="display:none;font-size:12px;color:var(--ink2);font-weight:600;padding:0 20px 4px"></div>
+      <div class="cart-total-row"><span style="font-size:13px;font-weight:600;color:var(--ink2)">Total</span><span class="cart-total" id="cart-total">0,00 €</span></div>
       </div>
       <div class="cart-items" id="cart-items"></div>
       <div class="notes-input"><input type="text" id="o-notes" placeholder="📝 Notas (alergias, sin sal…)"></div>
@@ -495,11 +498,11 @@
   <div class="modal">
     <h2>Arqueo de caja · Cierre de turno</h2>
     <p class="msub">Cuenta el efectivo de la caja e introduce el importe real</p>
-    <div class="summary-line"><span>Fondo inicial</span><b id="aq-fondo">0,00 €</b></div>
+    <div id="aq-detail"><div class="summary-line"><span>Fondo inicial</span><b id="aq-fondo">0,00 €</b></div>
     <div class="summary-line"><span>(+) Ventas en efectivo</span><b id="aq-vef">0,00 €</b></div>
     <div class="summary-line"><span>(+) Entradas manuales</span><b id="aq-ent">0,00 €</b></div>
     <div class="summary-line"><span>(−) Salidas manuales</span><b id="aq-sal">0,00 €</b></div>
-    <div class="summary-line total"><span>Efectivo esperado</span><span id="aq-esperado">0,00 €</span></div>
+    <div class="summary-line total"><span>Efectivo esperado</span><span id="aq-esperado">0,00 €</span></div></div>
     <div class="mfield"><label>Efectivo contado en caja (€)</label><input type="number" id="aq-contado" placeholder="0.00" min="0" step="0.05"></div>
     <div class="summary-line" id="aq-dif-line" style="display:none"><span>Diferencia</span><b id="aq-dif">0,00 €</b></div>
     <hr style="border:none;border-top:1px solid var(--line);margin:12px 0">
@@ -507,7 +510,8 @@
     <div class="summary-line"><span>📱 Bizum (a banco)</span><b id="aq-bi">0,00 €</b></div>
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="closeModal('modal-arqueo')">Volver</button>
-      <button class="btn btn-red" id="aq-confirm" style="flex:1">Cerrar caja ✓</button>
+      <button class="btn btn-dark" id="aq-x" style="flex:1">📋 Arqueo parcial (X)</button>
+      <button class="btn btn-red" id="aq-confirm" style="flex:1">🔒 Cerrar arqueo y jornada (Z)</button>
     </div>
   </div>
 </div>
@@ -646,6 +650,7 @@ async function dbLoadAll(){
       notes:o.notes||'', total:+o.total, paid:o.paid, t:new Date(o.created_at).getTime(),
       kdsT:o.sent_at?new Date(o.sent_at).getTime():null,
       items:(o.order_items||[]).map(i=>({name:i.name,price:+i.price,qty:i.qty})),
+      tip:+o.tip||0,
       nped:o.pay_method?('Cobro: '+o.pay_method):''
     }));
     state.nextId = state.pedidos.reduce((m,p)=>Math.max(m,p.id+1),1);
@@ -693,7 +698,7 @@ async function dbUpsertOrderRaw(p){
   if(!sb) return p.id;
   const row={ type:p.type, status:p.status, name:p.name, phone:p.phone, addr:p.addr,
     pickup:p.pickup, driver:p.driver, notes:p.notes, total:p.total, paid:p.paid,
-    pay_method:p.payMethodUsed||'', sent_at:p.kdsT?new Date(p.kdsT).toISOString():null };
+    tip:p.tip||0, pay_method:p.payMethodUsed||'', sent_at:p.kdsT?new Date(p.kdsT).toISOString():null };
   if(p._inDb){
     await sb.from('orders').update(row).eq('id',p.id);
     await sb.from('order_items').delete().eq('order_id',p.id);
@@ -817,7 +822,7 @@ function applyRoleUI(){
 /* ================= CONFIG ================= */
 let CONFIG = { businessName:'Asador de Pollos Virgen del Carmen', businessAddr:'',
   businessPhone:'', businessNif:'', ticketFooter:'¡Gracias por su compra!',
-  autoPrintKitchen:'1', soundNewOrder:'1' };
+  autoPrintKitchen:'1', soundNewOrder:'1', blindArqueo:'0', deliveryFee:'0' };
 function fillConfigForm(){
   document.getElementById('cfg-name').value=CONFIG.businessName||'';
   document.getElementById('cfg-addr').value=CONFIG.businessAddr||'';
@@ -826,6 +831,8 @@ function fillConfigForm(){
   document.getElementById('cfg-footer').value=CONFIG.ticketFooter||'';
   document.getElementById('cfg-autoprint').checked = CONFIG.autoPrintKitchen==='1';
   document.getElementById('cfg-sound').checked = CONFIG.soundNewOrder==='1';
+  document.getElementById('cfg-blind').checked = CONFIG.blindArqueo==='1';
+  document.getElementById('cfg-fee').value=CONFIG.deliveryFee||'';
 }
 function readConfigForm(){
   CONFIG.businessName=document.getElementById('cfg-name').value.trim()||'Asador de Pollos Virgen del Carmen';
@@ -835,6 +842,8 @@ function readConfigForm(){
   CONFIG.ticketFooter=document.getElementById('cfg-footer').value.trim()||'¡Gracias por su compra!';
   CONFIG.autoPrintKitchen=document.getElementById('cfg-autoprint').checked?'1':'0';
   CONFIG.soundNewOrder=document.getElementById('cfg-sound').checked?'1':'0';
+  CONFIG.blindArqueo=document.getElementById('cfg-blind').checked?'1':'0';
+  CONFIG.deliveryFee=document.getElementById('cfg-fee').value.trim()||'0';
 }
 async function loadSettings(){
   if(sb){
@@ -974,8 +983,8 @@ document.getElementById('rep-from').addEventListener('change',renderInformes);
 document.getElementById('rep-to').addEventListener('change',renderInformes);
 document.getElementById('btn-rep-csv').addEventListener('click',()=>{
   const r=computeInforme();
-  const rows=['ID;Fecha;Tipo;Cliente;Telefono;Total'];
-  r.list.forEach(p=>rows.push([p.id,new Date(p.t).toLocaleString('es-ES'),p.type,'"'+(p.name||'')+'"',p.phone||'',p.total.toFixed(2).replace('.',',')].join(';')));
+  const rows=['ID;Fecha;Tipo;Cliente;Telefono;Propina;Total'];
+  r.list.forEach(p=>rows.push([p.id,new Date(p.t).toLocaleString('es-ES'),p.type,'"'+(p.name||'')+'"',p.phone||'',(p.tip||0).toFixed(2).replace('.',','),p.total.toFixed(2).replace('.',',')].join(';')));
   const blob=new Blob(['\ufeff'+rows.join('\n')],{type:'text/csv'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='ventas.csv'; a.click();
   toast('⬇️ CSV descargado');
@@ -1113,6 +1122,9 @@ function renderDriverSelects(){
 /* ================= RENDER: CART ================= */
 function renderCart(){
   document.getElementById('cart-title').textContent = editingId ? `Editando pedido #${editingId}` : `Nuevo pedido · ${OTYPES[orderType].label}`;
+  const feeEl=document.getElementById('cart-fee');
+  if(feeEl){ feeEl.style.display=(orderType==='domicilio'&&(parseFloat(CONFIG.deliveryFee)||0)>0)?'block':'none';
+    if(orderType==='domicilio') feeEl.textContent='+ '+fmt(parseFloat(CONFIG.deliveryFee)||0)+' de reparto'; }
   document.getElementById('cart-total').textContent = fmt(cartTotal());
   document.getElementById('fab-total').textContent = fmt(cartTotal());
   document.getElementById('btn-pay').disabled = cart.length===0;
@@ -1201,7 +1213,8 @@ function renderPedidos(){
         return `<div class="ped-mini">
           <span class="pm-id">${orderLabel(p)}</span>
           <span class="pm-who"><b>${p.name}</b>${p.phone?' · '+p.phone:''}</span>
-          <span class="pm-meta">${p.items.reduce((s,i)=>s+i.qty,0)} art · hace ${mins} min</span>
+          <span class="pm-meta">${p.items.reduce((s,i)=>s+i.qty,0)} art · hace ${mins} min${p.tip?' · propina '+fmt(p.tip):''}</span>
+          ${p.type==='domicilio'&&p.driver?'<span class="chip driver">🛵 '+p.driver+'</span>':''}
           <span class="pm-total">${fmt(p.total)}</span>
           <button class="btn btn-ghost" data-print="${p.id}" title="Reimprimir ticket">🖨️</button>
         </div>`;}).join('')
@@ -1405,9 +1418,10 @@ function createOrUpdate(status){
   const notes=document.getElementById('o-notes').value.trim();
   const pickup=document.getElementById('c-pickup').value;
   const driver=document.getElementById('c-driver').value;
+  const fee=(orderType==='domicilio')?(parseFloat(CONFIG.deliveryFee)||0):0;
   const data={type:orderType, name:c.name, phone:c.phone, addr:c.addr,
     pickup: orderType==='mostrador'?'':pickup, driver: orderType==='domicilio'?driver:'',
-    notes, items:JSON.parse(JSON.stringify(cart)), total:cartTotal()};
+    notes, items:JSON.parse(JSON.stringify(cart)), total:+(cartTotal()+fee).toFixed(2)};
   let p;
   if(editingId){
     p=state.pedidos.find(x=>x.id===editingId);
@@ -1543,6 +1557,7 @@ document.getElementById('pay-confirm').onclick=async ()=>{
     state.ventas+=p.total*state.tipPct; // propina aparte
     p.nped=`Cobro: ${state.payMethod}${state.tipPct?' + propina':''}`;
     p.payMethodUsed=state.payMethod;
+    p.tip=Math.round(p.total*state.tipPct*100)/100;
     if(sb){ await dbUpsertOrder(p); await dbAddMovement('venta',state.payMethod,p.total,'Pedido #'+p.id); }
     pid=p.id; resetForm();
   } else {
@@ -1553,6 +1568,7 @@ document.getElementById('pay-confirm').onclick=async ()=>{
     if(p.kdsT) state.prepTimes.push(Math.round((Date.now()-p.kdsT)/60000));
     p.nped=`Cobro: ${state.payMethod}${state.tipPct?' + propina':''}`;
     p.payMethodUsed=state.payMethod;
+    p.tip=Math.round(p.total*state.tipPct*100)/100;
     if(sb){ await dbUpsertOrder(p); await dbAddMovement('venta',state.payMethod,p.total,'Pedido #'+p.id); }
     pid=p.id;
   }
@@ -1659,8 +1675,27 @@ document.getElementById('btn-mov').onclick=async ()=>{
   renderCaja(); toast(`${tipo==='entrada'?'➕ Entrada':'➖ Salida'} registrada · ${fmt(imp)}`);
 };
 
+function printTicketArqueo(kind, esp, contado, dif){
+  const c=state.caja;
+  const t0=new Date(); t0.setHours(0,0,0,0);
+  const ventasDia=state.pedidos.filter(p=>p.paid&&p.t>=t0.getTime()).reduce((s,p)=>s+p.total,0);
+  document.getElementById('ticket-print').innerHTML=
+    '<div style="font-size:18px;font-weight:bold;text-align:center;letter-spacing:2px">ARQUEO '+kind+'</div>'+
+    '<div class="trow"><span>FECHA</span><span>'+new Date().toLocaleString('es-ES')+'</span></div>'+
+    '<div class="trow"><span>FONDO</span><span>'+fmt(c.fondo)+'</span></div>'+
+    '<div class="trow"><span>VENTAS EFECTIVO</span><span>'+fmt(c.vEfectivo)+'</span></div>'+
+    '<div class="trow"><span>ENTRADAS/SALIDAS</span><span>+'+fmt(c.entradas)+' / −'+fmt(c.salidas)+'</span></div>'+
+    '<hr><div class="trow ttotal"><span>ESPERADO</span><span>'+fmt(esp)+'</span></div>'+
+    '<div class="trow"><span>CONTADO</span><span>'+fmt(contado)+'</span></div>'+
+    '<div class="trow"><span>DIFERENCIA</span><span>'+(dif>=0?'+':'−')+fmt(Math.abs(dif))+'</span></div>'+
+    (kind==='Z'?'<hr><div class="trow ttotal"><span>VENTAS DEL DÍA</span><span>'+fmt(ventasDia)+'</span></div>':'')+
+    '<hr><div class="tc tsmall">'+esc(CONFIG.businessName)+'</div>';
+  window.print();
+}
+
 document.getElementById('btn-arqueo').onclick=()=>{
   const c=state.caja;
+  document.getElementById('aq-detail').style.display = CONFIG.blindArqueo==='1'?'none':'block';
   document.getElementById('aq-fondo').textContent=fmt(c.fondo);
   document.getElementById('aq-vef').textContent=fmt(c.vEfectivo);
   document.getElementById('aq-ent').textContent=fmt(c.entradas);
@@ -1683,6 +1718,29 @@ document.getElementById('aq-contado').addEventListener('input',()=>{
   el.style.color = dif===0 ? 'var(--green)' : 'var(--red)';
 });
 
+document.getElementById('aq-x').onclick=async ()=>{
+  const c=state.caja;
+  const contado=parseFloat(document.getElementById('aq-contado').value)||0;
+  const esp=cajaEsperado(), dif=contado-esp;
+  c.historial.unshift({fecha:new Date(), esperado:esp, contado, dif,
+    tarjeta:c.vTarjeta, bizum:c.vBizum, ventas:c.vEfectivo+c.vTarjeta+c.vBizum});
+  if(sb){
+    try{
+      await sb.from('cash_arqueos').insert({ kind:'X', closed_at:new Date().toISOString(), fondo:c.fondo,
+        esperado:esp, contado, dif, v_efectivo:c.vEfectivo, v_tarjeta:c.vTarjeta, v_bizum:c.vBizum,
+        entradas:c.entradas, salidas:c.salidas, ventas_total:c.vEfectivo+c.vTarjeta+c.vBizum });
+      state.arqueos.unshift({ fecha:Date.now(), esperado:esp, contado, dif });
+    }catch(e){}
+  }
+  const dbId=c.dbId, fondo=c.fondo, historial=c.historial;
+  state.caja={abierta:true, dbId, fondo, vEfectivo:0, vTarjeta:0, vBizum:0, entradas:0, salidas:0,
+    movs:[{t:Date.now(),tipo:'apertura',metodo:'',importe:fondo,nota:'Nueva jornada tras arqueo X'}], historial};
+  if(sb) await dbAddMovement('apertura','',fondo,'Nueva jornada tras arqueo X');
+  closeModal('modal-arqueo'); renderAll();
+  printTicketArqueo('X', esp, contado, dif);
+  toast('📋 Arqueo X guardado — la caja sigue abierta para la siguiente jornada');
+};
+
 document.getElementById('aq-confirm').onclick=async ()=>{
   const c=state.caja;
   const contado=parseFloat(document.getElementById('aq-contado').value)||0;
@@ -1691,12 +1749,13 @@ document.getElementById('aq-confirm').onclick=async ()=>{
     tarjeta:c.vTarjeta, bizum:c.vBizum, ventas:c.vEfectivo+c.vTarjeta+c.vBizum});
   if(sb){
     try{
-      await sb.from('cash_arqueos').insert({ closed_at:new Date().toISOString(), fondo:c.fondo,
+      await sb.from('cash_arqueos').insert({ kind:'Z', closed_at:new Date().toISOString(), fondo:c.fondo,
         esperado:esp, contado, dif, v_efectivo:c.vEfectivo, v_tarjeta:c.vTarjeta, v_bizum:c.vBizum,
         entradas:c.entradas, salidas:c.salidas, ventas_total:c.vEfectivo+c.vTarjeta+c.vBizum });
       state.arqueos.unshift({ fecha:Date.now(), esperado:esp, contado, dif });
     }catch(e){}
   }
+  printTicketArqueo('Z', esp, contado, dif);
   if(sb && c.dbId){
     await sb.from('cash_sessions').update({ closed_at:new Date().toISOString(),
       v_efectivo:c.vEfectivo, v_tarjeta:c.vTarjeta, v_bizum:c.vBizum,
