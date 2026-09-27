@@ -430,6 +430,7 @@
             <input type="number" id="cfg-fee" placeholder="Suplemento domicilio €" step="0.1" min="0" style="max-width:160px">
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap"><input type="checkbox" id="cfg-blind"> 🙈 Arqueo ciego</label>
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap"><input type="checkbox" id="cfg-rate"> ⭐ QR valoración en ticket</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap"><input type="checkbox" id="cfg-webopen"> 🌐 Aceptar pedidos online</label>
             <button class="btn btn-red" id="btn-cfg">Guardar</button>
           </div>
         </div>
@@ -659,7 +660,7 @@ async function dbLoadAll(){
       notes:o.notes||'', total:+o.total, paid:o.paid, t:new Date(o.created_at).getTime(),
       kdsT:o.sent_at?new Date(o.sent_at).getTime():null,
       items:(o.order_items||[]).map(i=>({name:i.name,price:+i.price,qty:i.qty})),
-      tip:+o.tip||0,
+      tip:+o.tip||0, source:o.source||'tpv',
       nped:o.pay_method?('Cobro: '+o.pay_method):''
     }));
     state.nextId = state.pedidos.reduce((m,p)=>Math.max(m,p.id+1),1);
@@ -707,7 +708,7 @@ async function dbUpsertOrderRaw(p){
   if(!sb) return p.id;
   const row={ type:p.type, status:p.status, name:p.name, phone:p.phone, addr:p.addr,
     pickup:p.pickup, driver:p.driver, notes:p.notes, total:p.total, paid:p.paid,
-    tip:p.tip||0, pay_method:p.payMethodUsed||'', sent_at:p.kdsT?new Date(p.kdsT).toISOString():null };
+    tip:p.tip||0, source:p.source||'tpv', pay_method:p.payMethodUsed||'', sent_at:p.kdsT?new Date(p.kdsT).toISOString():null };
   if(p._inDb){
     await sb.from('orders').update(row).eq('id',p.id);
     await sb.from('order_items').delete().eq('order_id',p.id);
@@ -831,7 +832,7 @@ function applyRoleUI(){
 /* ================= CONFIG ================= */
 let CONFIG = { businessName:'Asador de Pollos Virgen del Carmen', businessAddr:'',
   businessPhone:'', businessNif:'', ticketFooter:'¡Gracias por su compra!',
-  autoPrintKitchen:'1', soundNewOrder:'1', blindArqueo:'0', deliveryFee:'0', rateQr:'1' };
+  autoPrintKitchen:'1', soundNewOrder:'1', blindArqueo:'0', deliveryFee:'0', rateQr:'1', webOpen:'1', webDomicilio:'0' };
 function fillConfigForm(){
   document.getElementById('cfg-name').value=CONFIG.businessName||'';
   document.getElementById('cfg-addr').value=CONFIG.businessAddr||'';
@@ -843,6 +844,7 @@ function fillConfigForm(){
   document.getElementById('cfg-blind').checked = CONFIG.blindArqueo==='1';
   document.getElementById('cfg-fee').value=CONFIG.deliveryFee||'';
   document.getElementById('cfg-rate').checked = CONFIG.rateQr==='1';
+  document.getElementById('cfg-webopen').checked = CONFIG.webOpen==='1';
 }
 function readConfigForm(){
   CONFIG.businessName=document.getElementById('cfg-name').value.trim()||'Asador de Pollos Virgen del Carmen';
@@ -855,6 +857,7 @@ function readConfigForm(){
   CONFIG.blindArqueo=document.getElementById('cfg-blind').checked?'1':'0';
   CONFIG.deliveryFee=document.getElementById('cfg-fee').value.trim()||'0';
   CONFIG.rateQr=document.getElementById('cfg-rate').checked?'1':'0';
+  CONFIG.webOpen=document.getElementById('cfg-webopen').checked?'1':'0';
 }
 async function loadSettings(){
   if(sb){
@@ -1119,7 +1122,13 @@ function checkNewOrders(){
   if(seenOrderIds===null){ seenOrderIds=new Set(ids); return; }
   const fresh=ids.filter(id=>!seenOrderIds.has(id));
   fresh.forEach(id=>seenOrderIds.add(id));
-  if(fresh.length){ playBeep(); }
+  if(fresh.length){
+    playBeep();
+    fresh.forEach(id=>{
+      const o=state.pedidos.find(x=>x.id===id);
+      if(o && o.source==='web' && CONFIG.autoPrintKitchen==='1') printKitchenOrder(o);
+    });
+  }
 }
 
 function renderFichajeReminder(){
@@ -1280,6 +1289,7 @@ function renderPedidos(){
       list.map(p=>{ const mins=Math.round((Date.now()-p.t)/60000);
         return `<div class="ped-mini">
           <span class="pm-id">${orderLabel(p)}</span>
+          ${p.source==='web'?'<span class="chip" style="background:#e8f0fe;color:#1a56db">🌐</span>':''}
           <span class="pm-who"><b>${p.name}</b>${p.phone?' · '+p.phone:''}</span>
           <span class="pm-meta">${p.items.reduce((s,i)=>s+i.qty,0)} art · hace ${mins} min${p.tip?' · propina '+fmt(p.tip):''}</span>
           ${p.type==='domicilio'&&p.driver?'<span class="chip driver">🛵 '+p.driver+'</span>':''}
@@ -1298,6 +1308,7 @@ function renderPedidos(){
         <span style="display:flex;gap:6px;align-items:center">
           <span class="chip ${STATUS[p.status].chip}">${STATUS[p.status].label}</span>
           ${p.type!=='mostrador'?`<span class="chip driver">${pickupLabel(p)}</span>`:''}
+          ${p.source==='web'?`<span class="chip" style="background:#e8f0fe;color:#1a56db">🌐 WEB</span>`:''}
         </span></div>
       <div class="pwho"><b>${p.name}</b>${p.phone?` · 📞 ${p.phone}`:''}${p.addr?`<br>📍 ${p.addr}`:''}<br><span>creado hace ${mins} min</span></div>
       <div class="pitems">${p.items.map(i=>`<div><span class="pq">${i.qty}×</span>${i.name}</div>`).join('')}</div>
@@ -1389,7 +1400,7 @@ function renderKds(){
     const mins=p.kdsT?Math.round((Date.now()-p.kdsT)/60000):0;
     return `<div class="kds-card">
       <div class="kh"><b>${orderLabel(p)}<br><small style="color:var(--ink2)">${p.name}</small></b><span class="chip ${p.status==='cocina'?'warn':'ok'}">${STATUS[p.status].label}</span></div>
-      <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:6px">${pickupLabel(p)}</div>
+      <div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:6px">${pickupLabel(p)}${p.source==='web'?' &nbsp;·&nbsp; 🌐 WEB':''}</div>
       ${p.items.map(i=>`<div class="kds-line"><span class="q">${i.qty}×</span><span>${i.name}</span></div>`).join('')}
       ${p.notes?`<div class="pnotes" style="margin-top:8px">📝 ${p.notes}</div>`:''}
       <div style="font-size:11px;color:var(--ink2);margin-top:8px">${p.status==='cocina'?'En preparación · '+mins+' min':'Listo para entregar'}</div>
@@ -1744,7 +1755,11 @@ document.getElementById('btn-open-caja').onclick=async ()=>{
     dbId = data ? data.id : null;
   }
   state.caja={abierta:true, dbId, fondo, vEfectivo:0, vTarjeta:0, vBizum:0, entradas:0, salidas:0, movs:[{t:Date.now(),tipo:'apertura',metodo:'',importe:fondo,nota:'Apertura de caja'}], historial:state.caja.historial};
-  if(sb) await dbAddMovement('apertura','',fondo,'Apertura de caja');
+  if(sb){
+    await dbAddMovement('apertura','',fondo,'Apertura de caja');
+    CONFIG.webOpen='1';
+    await sb.from('settings').upsert({ key:'webOpen', value:'1' }, { onConflict:'key' });
+  }
   renderAll(); toast(`🔓 Caja abierta con fondo de ${fmt(fondo)}`);
 };
 
@@ -1846,9 +1861,12 @@ document.getElementById('aq-confirm').onclick=async ()=>{
       v_efectivo:c.vEfectivo, v_tarjeta:c.vTarjeta, v_bizum:c.vBizum,
       entradas:c.entradas, salidas:c.salidas }).eq('id',c.dbId);
   }
+  if(sb){
+    try{ CONFIG.webOpen='0'; await sb.from('settings').upsert({ key:'webOpen', value:'0' }, { onConflict:'key' }); }catch(e){}
+  }
   state.caja={abierta:false, fondo:0, vEfectivo:0, vTarjeta:0, vBizum:0, entradas:0, salidas:0, movs:[], historial:c.historial};
   closeModal('modal-arqueo'); renderAll();
-  toast('✅ Caja cerrada y arqueo guardado');
+  toast('✅ Caja cerrada y arqueo guardado — pedidos online desactivados');
 };
 
 /* ================= INIT ================= */
