@@ -116,3 +116,12 @@ Ejecuta `supabase/schema-update-faseB-qm.sql` y sube el nuevo `index.html`.
 
 ### Actualizar una instalación existente
 Ejecuta `supabase/schema-update-faseC-qm.sql` y sube `index.html` + `valorar.html`.
+
+## Fotos locales de productos (Supabase Storage)
+
+- Botón **📷** junto a cada plato en Control → Carta: elige la foto desde tu equipo y se sube automáticamente (redimensionada a 800px, sin URLs externas)
+- Las fotos se guardan en el bucket `productos` de Supabase Storage (1 GB gratis) y se ven en las tarjetas del catálogo
+- El campo "URL foto" sigue disponible como alternativa manual
+
+### Actualizar una instalación existente
+Ejecuta `supabase/schema-update-fotos.sql` y sube el nuevo `index.html`.
