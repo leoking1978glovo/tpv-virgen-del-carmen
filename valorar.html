@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Valora tu pedido · Asador Virgen del Carmen</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Arial,sans-serif}
+  body{min-height:100vh;background:linear-gradient(160deg,#7a1d0e,#4a0e06);display:flex;align-items:center;justify-content:center;padding:20px}
+  .card{background:#fff;border-radius:22px;padding:34px 28px;width:100%;max-width:400px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.4)}
+  .logo{width:74px;height:74px;border-radius:50%;background:#7a1d0e;color:#fff;font-size:34px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px}
+  h1{font-size:19px;color:#2a1510;margin-bottom:2px}
+  .sub{font-size:13px;color:#7a6a62;margin-bottom:22px}
+  .btns{display:flex;gap:14px;margin-bottom:8px}
+  .vote{flex:1;padding:22px 8px;border-radius:16px;border:2.5px solid #ece4da;background:#faf7f2;font-size:40px;cursor:pointer;transition:.15s}
+  .vote small{display:block;font-size:13px;font-weight:700;margin-top:6px;color:#7a6a62}
+  .vote.up.sel{border-color:#1e8f5a;background:#e6f5ec}
+  .vote.down.sel{border-color:#c0392b;background:#fbe9e7}
+  textarea{width:100%;padding:13px;border:2px solid #ece4da;border-radius:12px;font-size:14px;margin-top:14px;resize:none;font-family:inherit}
+  textarea:focus{outline:none;border-color:#b4701b}
+  button.send{width:100%;padding:15px;margin-top:14px;background:#7a1d0e;color:#fff;border-radius:12px;font-weight:800;font-size:15px;border:none;cursor:pointer}
+  button.send:disabled{opacity:.4;cursor:not-allowed}
+  .thanks{display:none}
+  .thanks .big{font-size:52px;margin-bottom:10px}
+  .err{color:#c0392b;font-size:13px;margin-top:10px;display:none}
+</style></head><body>
+<div class="card" id="step1">
+  <div class="logo">🍗</div>
+  <h1>Asador de Pollos Virgen del Carmen</h1>
+  <p class="sub" id="subtitle">¿Cómo fue tu pedido?</p>
+  <div class="btns">
+    <button class="vote up" id="v-up">👍<small>Todo bien</small></button>
+    <button class="vote down" id="v-down">👎<small>Algo fue mal</small></button>
+  </div>
+  <textarea id="comment" rows="3" placeholder="Cuéntanos más (opcional)"></textarea>
+  <button class="send" id="send" disabled>Enviar valoración</button>
+  <p class="err" id="err">No se pudo enviar. Inténtalo de nuevo en un momento.</p>
+</div>
+<div class="card thanks" id="step2">
+  <div class="big">🙌</div>
+  <h1>¡Gracias por tu opinión!</h1>
+  <p class="sub">Nos ayuda a mejorar cada día</p>
+</div>
+
+<script>
+const SUPABASE_URL='https://yizpwmjkutzvdncsxywq.supabase.co';
+const SUPABASE_ANON_KEY='sb_publishable_qke6Jlm_Xjco_OdVqBWlpA_IiBX4srK';
+const sb=window.supabase?window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY):null;
+const orderId=new URLSearchParams(location.search).get('p');
+if(orderId){ document.getElementById('subtitle').textContent='¿Cómo fue tu pedido #'+orderId+'?'; }
+let rating=null;
+const sendBtn=document.getElementById('send');
+function select(v){
+  rating=v;
+  document.getElementById('v-up').classList.toggle('sel',v==='up');
+  document.getElementById('v-down').classList.toggle('sel',v==='down');
+  sendBtn.disabled=false;
+}
+document.getElementById('v-up').onclick=()=>select('up');
+document.getElementById('v-down').onclick=()=>select('down');
+sendBtn.onclick=async ()=>{
+  if(!rating) return;
+  sendBtn.disabled=true; sendBtn.textContent='Enviando…';
+  try{
+    if(!sb) throw new Error('sin conexion');
+    const { error } = await sb.from('reviews').insert({ order_id: orderId?parseInt(orderId):null, rating, comment: document.getElementById('comment').value.trim() });
+    if(error) throw error;
+    document.getElementById('step1').style.display='none';
+    document.getElementById('step2').style.display='block';
+  }catch(e){
+    document.getElementById('err').style.display='block';
+    sendBtn.disabled=false; sendBtn.textContent='Enviar valoración';
+  }
+};
+</script>
+</body></html>

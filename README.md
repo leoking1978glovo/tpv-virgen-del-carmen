@@ -107,3 +107,12 @@ Ejecuta `supabase/schema-update-faseA-qm.sql` y sube el nuevo `index.html`.
 
 ### Actualizar una instalación existente
 Ejecuta `supabase/schema-update-faseB-qm.sql` y sube el nuevo `index.html`.
+
+## Fase C (Qamarero): valoraciones de clientes
+
+- **QR de valoración en el ticket** del cliente (activable en Configuración) → escanea y abre `valorar.html`
+- **Página pública de valoración** (`valorar.html`): 👍/👎 + comentario opcional, sin necesidad de login. Los clientes pueden enviar; solo los empleados logueados pueden leer (RLS)
+- **Control → ⭐ Valoraciones**: resumen con % positivas y últimas opiniones con pedido, comentario y fecha
+
+### Actualizar una instalación existente
+Ejecuta `supabase/schema-update-faseC-qm.sql` y sube `index.html` + `valorar.html`.

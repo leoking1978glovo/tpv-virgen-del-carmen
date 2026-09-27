@@ -215,6 +215,7 @@
   }
 </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="theme-color" content="#7a1d0e">
   <meta name="mobile-web-app-capable" content="yes">
@@ -401,6 +402,10 @@
           <div id="fichaje-body"></div>
         </div>
         <div class="drivers-card">
+          <h3>⭐ Valoraciones de clientes</h3>
+          <div id="resenas-body"></div>
+        </div>
+        <div class="drivers-card">
           <h3>🍗 Carta · productos y precios</h3>
           <p style="font-size:12px;color:var(--ink2);margin-bottom:10px">Edita precios al instante y añade productos. Los cambios se aplican en todos los dispositivos.</p>
           <div id="carta-admin"></div>
@@ -424,6 +429,7 @@
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap"><input type="checkbox" id="cfg-sound"> 🔊 Sonido al entrar pedido nuevo</label>
             <input type="number" id="cfg-fee" placeholder="Suplemento domicilio €" step="0.1" min="0" style="max-width:160px">
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap"><input type="checkbox" id="cfg-blind"> 🙈 Arqueo ciego</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap"><input type="checkbox" id="cfg-rate"> ⭐ QR valoración en ticket</label>
             <button class="btn btn-red" id="btn-cfg">Guardar</button>
           </div>
         </div>
@@ -518,6 +524,7 @@
 
 <!-- TICKET PARA IMPRIMIR -->
 <div id="ticket-print"></div>
+<img id="qr-img" style="display:none" alt="">
 
 <div class="toast" id="toast"></div>
 
@@ -633,14 +640,16 @@ async function dbLoadAll(){
   const today=new Date(); today.setHours(0,0,0,0);
   const sess = await sb.from('cash_sessions').select('*').is('closed_at',null).maybeSingle();
   const cajaId = sess.data ? sess.data.id : null;
-  const [prods,drv,ords,ss,movs] = await Promise.all([
+  const [prods,drv,ords,ss,movs,revs] = await Promise.all([
     sb.from('products').select('*').eq('active',true).order('position'),
     sb.from('drivers').select('*').eq('active',true).order('name'),
     sb.from('orders').select('*, order_items(*)').order('created_at'),
     Promise.resolve(sess),
     cajaId ? sb.from('cash_movements').select('*').eq('session_id',cajaId).order('id',{ascending:false}).limit(100)
-           : Promise.resolve({data:[]})
+           : Promise.resolve({data:[]}),
+    sb.from('reviews').select('*').order('created_at',{ascending:false}).limit(50)
   ]);
+  state.resenas = revs.data ? revs.data : [];
   if(prods.data) rebuildCatalog(prods.data);
   if(drv.data) state.drivers = drv.data.map(d=>d.name);
   if(ords.data){
@@ -822,7 +831,7 @@ function applyRoleUI(){
 /* ================= CONFIG ================= */
 let CONFIG = { businessName:'Asador de Pollos Virgen del Carmen', businessAddr:'',
   businessPhone:'', businessNif:'', ticketFooter:'¡Gracias por su compra!',
-  autoPrintKitchen:'1', soundNewOrder:'1', blindArqueo:'0', deliveryFee:'0' };
+  autoPrintKitchen:'1', soundNewOrder:'1', blindArqueo:'0', deliveryFee:'0', rateQr:'1' };
 function fillConfigForm(){
   document.getElementById('cfg-name').value=CONFIG.businessName||'';
   document.getElementById('cfg-addr').value=CONFIG.businessAddr||'';
@@ -833,6 +842,7 @@ function fillConfigForm(){
   document.getElementById('cfg-sound').checked = CONFIG.soundNewOrder==='1';
   document.getElementById('cfg-blind').checked = CONFIG.blindArqueo==='1';
   document.getElementById('cfg-fee').value=CONFIG.deliveryFee||'';
+  document.getElementById('cfg-rate').checked = CONFIG.rateQr==='1';
 }
 function readConfigForm(){
   CONFIG.businessName=document.getElementById('cfg-name').value.trim()||'Asador de Pollos Virgen del Carmen';
@@ -844,6 +854,7 @@ function readConfigForm(){
   CONFIG.soundNewOrder=document.getElementById('cfg-sound').checked?'1':'0';
   CONFIG.blindArqueo=document.getElementById('cfg-blind').checked?'1':'0';
   CONFIG.deliveryFee=document.getElementById('cfg-fee').value.trim()||'0';
+  CONFIG.rateQr=document.getElementById('cfg-rate').checked?'1':'0';
 }
 async function loadSettings(){
   if(sb){
@@ -1012,6 +1023,18 @@ function renderFichaje(){
     '<span style="font-size:13px;color:var(--ink2)">'+esc(USER.name||'')+' · '+(inside?'Dentro del turno':'Fuera de turno')+'</span></div>'+
     (hoyRegs.length?'<div class="cat-title">HOY</div>'+hoyRegs.slice().reverse().map(f=>'<div class="driver-row"><span>'+(f.action==='in'?'🟢 Entrada':'🔴 Salida')+'</span><span class="dn">'+esc(f.name)+'</span><b>'+new Date(f.at).toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})+'</b></div>').join(''):'');
   const b=document.getElementById('btn-fichar'); if(b) b.onclick=fichar;
+}
+
+function renderResenas(){
+  const el=document.getElementById('resenas-body'); if(!el) return;
+  const rs=state.resenas||[];
+  if(!rs.length){
+    el.innerHTML='<div style="font-size:13px;color:var(--ink2);padding:8px 0">Aún no hay valoraciones. El QR aparece en los tickets cuando el toggle está activado.</div>';
+    return;
+  }
+  const ups=rs.filter(r=>r.rating==='up').length;
+  el.innerHTML='<div style="display:flex;gap:18px;margin-bottom:10px;font-weight:700;font-size:15px"><span style="color:var(--green)">👍 '+ups+'</span><span style="color:var(--red)">👎 '+(rs.length-ups)+'</span><span style="color:var(--ink2);font-size:12px;font-weight:600;align-self:center">'+(rs.length?Math.round(ups/rs.length*100):0)+'% positivas</span></div>'+
+    rs.slice(0,15).map(r=>'<div class="driver-row"><span style="font-size:16px">'+(r.rating==='up'?'👍':'👎')+'</span><span class="dn">Pedido #'+r.order_id+(r.comment?' — '+esc(r.comment):'')+'</span><b style="font-size:12px;color:var(--ink2);white-space:nowrap">'+new Date(r.created_at).toLocaleDateString('es-ES')+'</b></div>').join('');
 }
 
 /* ================= FASE A: dashboard, sonido, recordatorios ================= */
@@ -1484,6 +1507,14 @@ function printTicket(id){
     '<hr>'+
     '<div class="trow ttotal"><span>TOTAL</span><span>'+fmt(p.total)+'</span></div>'+
     (p.notes?'<hr><div class="tsmall"><b>NOTAS:</b> '+esc(p.notes)+'</div>':'')+
+    (function(){
+      if(CONFIG.rateQr!=='1'||typeof QRious==='undefined') return '';
+      try{
+        const img=document.getElementById('qr-img');
+        new QRious({element:img, value:'https://tpv-virgen-del-carmen.vercel.app/valorar.html?p='+p.id, size:140, level:'M'});
+        return '<hr><div class="tc"><img src="'+img.src+'" style="width:110px;height:110px"><div class="tsmall" style="margin-top:4px">Escanea y cuéntanos cómo fue tu pedido</div></div>';
+      }catch(e){ return ''; }
+    })()+
     '<hr>'+
     '<div class="tc tsmall">'+esc(CONFIG.ticketFooter)+'</div>';
   window.print();
@@ -1768,7 +1799,7 @@ document.getElementById('aq-confirm').onclick=async ()=>{
 
 /* ================= INIT ================= */
 function renderAll(){
-  ['renderArqueos','renderCartaAdmin','renderCart','renderQuick','renderPedidos','renderKds','renderControl','renderDashboard','renderInformes','renderFichaje','renderFichajeReminder','renderCaja','renderDriverSelects','checkNewOrders']
+  ['renderArqueos','renderCartaAdmin','renderCart','renderQuick','renderPedidos','renderKds','renderControl','renderDashboard','renderInformes','renderFichaje','renderFichajeReminder','renderCaja','renderResenas','renderDriverSelects','checkNewOrders']
     .forEach(fn=>{ try{ window[fn](); }catch(e){ console.error('Error en '+fn+':', e); } });
   try{ renderCatalog(document.getElementById('prod-search').value); }catch(e){ console.error('Error en renderCatalog:', e); }
 }
