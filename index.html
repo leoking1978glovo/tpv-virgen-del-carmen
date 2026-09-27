@@ -1507,16 +1507,25 @@ function printTicket(id){
     '<hr>'+
     '<div class="trow ttotal"><span>TOTAL</span><span>'+fmt(p.total)+'</span></div>'+
     (p.notes?'<hr><div class="tsmall"><b>NOTAS:</b> '+esc(p.notes)+'</div>':'')+
-    (function(){
-      if(CONFIG.rateQr!=='1'||typeof QRious==='undefined') return '';
-      try{
-        const img=document.getElementById('qr-img');
-        new QRious({element:img, value:'https://tpv-virgen-del-carmen.vercel.app/valorar.html?p='+p.id, size:140, level:'M'});
-        return '<hr><div class="tc"><img src="'+img.src+'" style="width:110px;height:110px"><div class="tsmall" style="margin-top:4px">Escanea y cuéntanos cómo fue tu pedido</div></div>';
-      }catch(e){ return ''; }
-    })()+
+    (CONFIG.rateQr==='1'?'<hr><div class="tc" id="qr-slot"></div>':'')+
     '<hr>'+
     '<div class="tc tsmall">'+esc(CONFIG.ticketFooter)+'</div>';
+  if(CONFIG.rateQr==='1'&&typeof QRious!=='undefined'){
+    try{
+      const slot=document.getElementById('qr-slot');
+      if(slot){
+        const cv=document.createElement('canvas');
+        cv.width=140; cv.height=140;
+        cv.style.width='110px'; cv.style.height='110px';
+        new QRious({element:cv, value:'https://tpv-virgen-del-carmen.vercel.app/valorar.html?p='+p.id, size:140, level:'M'});
+        slot.appendChild(cv);
+        const t=document.createElement('div');
+        t.className='tsmall'; t.style.marginTop='4px';
+        t.textContent='Escanea y cuéntanos cómo fue tu pedido';
+        slot.appendChild(t);
+      }
+    }catch(e){}
+  }
   window.print();
   toast('🖨️ Ticket del pedido #'+p.id+' enviado a imprimir');
 }
