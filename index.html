@@ -256,6 +256,7 @@
     <div class="clock"><span id="clock">--:--</span><small id="caja-state-text">Caja cerrada</small>
     <button id="btn-logout" style="display:none;font-size:11px;color:rgba(255,255,255,.8);text-decoration:underline;margin-top:2px">Cerrar sesión</button></div>
   </header>
+<div id="fichaje-reminder" style="display:none;background:#fef3e2;color:#b45309;font-size:13px;font-weight:700;text-align:center;padding:7px 14px;border-bottom:1px solid #f0d9b5">🕐 Olvidaste cerrar el fichaje de tu última jornada — pásate por Control → Fichaje para cerrarlo</div>
 
   <main>
     <div class="panel-left">
@@ -376,6 +377,16 @@
           </div>
         </div>
 
+        <div class="drivers-card" style="display:flex;gap:18px;flex-wrap:wrap;align-items:center">
+          <div style="flex:1;min-width:140px"><div style="font-size:11px;color:var(--ink2);font-weight:700;letter-spacing:.5px">VENTAS DE HOY</div><div id="dash-ventas" style="font-size:27px;font-weight:800;font-variant-numeric:tabular-nums">—</div></div>
+          <div style="flex:1;min-width:120px"><div style="font-size:11px;color:var(--ink2);font-weight:700;letter-spacing:.5px">ABIERTOS</div><div id="dash-abiertos" style="font-size:27px;font-weight:800">—</div></div>
+          <div style="flex:1;min-width:120px"><div style="font-size:11px;color:var(--ink2);font-weight:700;letter-spacing:.5px">CERRADOS HOY</div><div id="dash-cerrados" style="font-size:27px;font-weight:800">—</div></div>
+          <div style="flex:1;min-width:210px"><div style="font-size:11px;color:var(--ink2);font-weight:700;letter-spacing:.5px">STOCK</div><div id="dash-stock" style="font-size:13px;font-weight:700;line-height:1.7">—</div></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-red" onclick="document.querySelector('nav.tabs button[data-page=caja]').click()">💰 Ir a Caja</button>
+            <button class="btn btn-ghost" onclick="document.querySelector('nav.tabs button[data-page=nuevo]').click()">🛍️ Nuevo pedido</button>
+          </div>
+        </div>
         <div class="drivers-card" id="rep-card">
           <h3>📈 Informes de ventas</h3>
           <div class="driver-add" style="flex-wrap:wrap">
@@ -410,6 +421,7 @@
             <input type="text" id="cfg-nif" placeholder="NIF" style="max-width:130px">
             <input type="text" id="cfg-footer" placeholder="Texto del pie de ticket" style="flex:2;min-width:180px">
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap"><input type="checkbox" id="cfg-autoprint"> Imprimir comanda al enviar a cocina</label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap"><input type="checkbox" id="cfg-sound"> 🔊 Sonido al entrar pedido nuevo</label>
             <button class="btn btn-red" id="btn-cfg">Guardar</button>
           </div>
         </div>
@@ -605,7 +617,7 @@ function rebuildCatalog(prods){
   const cats=[], map={};
   prods.forEach(p=>{
     if(!map[p.category]){ map[p.category]=[]; cats.push(p.category); }
-    map[p.category].push({ name:p.name, price:+p.price, dbId:p.id, stock:(p.stock===null||p.stock===undefined)?null:+p.stock });
+    map[p.category].push({ name:p.name, price:+p.price, dbId:p.id, stock:(p.stock===null||p.stock===undefined)?null:+p.stock, image:p.image||'' });
   });
   CATEGORIES.length=0;
   cats.forEach(c=>CATEGORIES.push({ name:c, items:map[c] }));
@@ -805,7 +817,7 @@ function applyRoleUI(){
 /* ================= CONFIG ================= */
 let CONFIG = { businessName:'Asador de Pollos Virgen del Carmen', businessAddr:'',
   businessPhone:'', businessNif:'', ticketFooter:'¡Gracias por su compra!',
-  autoPrintKitchen:'1' };
+  autoPrintKitchen:'1', soundNewOrder:'1' };
 function fillConfigForm(){
   document.getElementById('cfg-name').value=CONFIG.businessName||'';
   document.getElementById('cfg-addr').value=CONFIG.businessAddr||'';
@@ -813,6 +825,7 @@ function fillConfigForm(){
   document.getElementById('cfg-nif').value=CONFIG.businessNif||'';
   document.getElementById('cfg-footer').value=CONFIG.ticketFooter||'';
   document.getElementById('cfg-autoprint').checked = CONFIG.autoPrintKitchen==='1';
+  document.getElementById('cfg-sound').checked = CONFIG.soundNewOrder==='1';
 }
 function readConfigForm(){
   CONFIG.businessName=document.getElementById('cfg-name').value.trim()||'Asador de Pollos Virgen del Carmen';
@@ -821,6 +834,7 @@ function readConfigForm(){
   CONFIG.businessNif=document.getElementById('cfg-nif').value.trim();
   CONFIG.ticketFooter=document.getElementById('cfg-footer').value.trim()||'¡Gracias por su compra!';
   CONFIG.autoPrintKitchen=document.getElementById('cfg-autoprint').checked?'1':'0';
+  CONFIG.soundNewOrder=document.getElementById('cfg-sound').checked?'1':'0';
 }
 async function loadSettings(){
   if(sb){
@@ -870,6 +884,7 @@ function renderCartaAdmin(){
       '<input type="number" value="'+p.price+'" step="0.05" min="0" data-cp="'+ci+'-'+pi+'" style="width:92px;padding:8px;border:2px solid var(--line);border-radius:10px;font-weight:700">'+
       '<span style="font-size:12px;color:var(--ink2)">€</span>'+
       '<input type="number" value="'+(p.stock===null?'':p.stock)+'" step="1" min="0" placeholder="Stock" data-st="'+ci+'-'+pi+'" style="width:80px;padding:8px;border:2px solid var(--line);border-radius:10px;font-weight:700">'+
+      '<input type="text" value="'+(p.image||'')+'" placeholder="URL foto (opcional)" data-im="'+ci+'-'+pi+'" style="flex:1;min-width:120px;padding:8px;border:2px solid var(--line);border-radius:10px;font-weight:600;font-size:12px">'+
       '<button class="btn btn-ghost" data-sv="'+ci+'-'+pi+'">💾</button></div>').join('')
   ).join('');
   el.querySelectorAll('[data-sv]').forEach(b=>b.onclick=async ()=>{
@@ -877,8 +892,9 @@ function renderCartaAdmin(){
     const price=parseFloat(el.querySelector('[data-cp="'+ci+'-'+pi+'"]').value)||0;
     const stRaw=el.querySelector('[data-st="'+ci+'-'+pi+'"]').value;
     const stock=stRaw===''?null:Math.max(0,parseInt(stRaw)||0);
-    const p=CATEGORIES[ci].items[pi]; p.price=price; p.stock=stock;
-    if(sb && p.dbId) await sb.from('products').update({price, stock}).eq('id',p.dbId);
+    const image=el.querySelector('[data-im="'+ci+'-'+pi+'"]').value.trim();
+    const p=CATEGORIES[ci].items[pi]; p.price=price; p.stock=stock; p.image=image;
+    if(sb && p.dbId) await sb.from('products').update({price, stock, image:image||null}).eq('id',p.dbId);
     renderAll(); toast('💾 '+p.name+' → '+fmt(price));
   });
 }
@@ -989,6 +1005,54 @@ function renderFichaje(){
   const b=document.getElementById('btn-fichar'); if(b) b.onclick=fichar;
 }
 
+/* ================= FASE A: dashboard, sonido, recordatorios ================= */
+function renderDashboard(){
+  const v=document.getElementById('dash-ventas'); if(!v) return;
+  const t0=new Date(); t0.setHours(0,0,0,0);
+  const hoy=state.pedidos.filter(p=>p.t>=t0.getTime());
+  const cerrados=hoy.filter(p=>p.status==='entregado');
+  const abiertos=state.pedidos.filter(p=>isActiveStatus(p.status));
+  v.textContent=fmt(cerrados.reduce((s,p)=>s+p.total,0));
+  document.getElementById('dash-abiertos').textContent=abiertos.length;
+  document.getElementById('dash-cerrados').textContent=cerrados.length;
+  const agot=ALL_PRODS.filter(p=>p.stock!==null&&p.stock<=0);
+  const pocas=ALL_PRODS.filter(p=>p.stock!==null&&p.stock>0&&p.stock<=5);
+  const suf=ALL_PRODS.filter(p=>p.stock===null||p.stock>5).length;
+  document.getElementById('dash-stock').innerHTML=
+    '<span style="color:var(--red)">'+agot.length+' agotados</span> · <span style="color:var(--amber)">'+pocas.length+' pocas uds.</span> · <span style="color:var(--green)">'+suf+' bien</span>'+
+    (agot.length?'<div style="font-weight:600;color:var(--red);font-size:12px">'+agot.slice(0,3).map(p=>esc(p.name)).join(', ')+(agot.length>3?'…':'')+'</div>':'');
+}
+
+function playBeep(){
+  if(CONFIG.soundNewOrder!=='1') return;
+  try{
+    const ctx=new (window.AudioContext||window.webkitAudioContext)();
+    [880,1174].forEach((f,i)=>{
+      const o=ctx.createOscillator(), g=ctx.createGain();
+      o.connect(g); g.connect(ctx.destination);
+      o.frequency.value=f; g.gain.value=0.1;
+      const t=ctx.currentTime+i*0.18;
+      o.start(t); o.stop(t+0.16);
+    });
+  }catch(e){}
+}
+let seenOrderIds=null;
+function checkNewOrders(){
+  const ids=state.pedidos.map(p=>p.id);
+  if(seenOrderIds===null){ seenOrderIds=new Set(ids); return; }
+  const fresh=ids.filter(id=>!seenOrderIds.has(id));
+  fresh.forEach(id=>seenOrderIds.add(id));
+  if(fresh.length){ playBeep(); }
+}
+
+function renderFichajeReminder(){
+  const last=state.fichajes&&state.fichajes[0];
+  const el=document.getElementById('fichaje-reminder');
+  if(last&&last.action==='in'&&(Date.now()-new Date(last.at).getTime())>10*3600*1000){
+    if(el) el.style.display='block';
+  } else if(el){ el.style.display='none'; }
+}
+
 async function initApp(){
   tick(); renderPickupSlots(); applyTypeUI();
   if(!sb) showLocalBanner();
@@ -1072,25 +1136,30 @@ function renderCart(){
 
 /* ================= RENDER: CATALOG ================= */
 let ALL_PRODS = CATEGORIES.flatMap(cc=>cc.items);
+const CAT_COLORS=['#7a1d0e','#b4701b','#1e8f5a','#1a56db','#6d28d9','#b45309','#0e7490','#be185d'];
 function renderCatalog(filter=''){
-  const f=filter.toLowerCase();
-  document.getElementById('catalog').innerHTML = CATEGORIES.map(c=>{
+  const f=(filter||'').toLowerCase();
+  document.getElementById('catalog').innerHTML = CATEGORIES.map((c,ci)=>{
     const items=c.items.filter(p=>(p.name||'').toLowerCase().includes(f));
     if(!items.length) return '';
-    return `<div class="cat-title">${c.name}</div>
-    <div class="prod-grid">${items.map(p=>{
+    const col=CAT_COLORS[ci%CAT_COLORS.length];
+    return '<div class="cat-title" style="display:inline-block;background:'+col+';color:#fff;padding:6px 16px;border-radius:10px;font-size:11px;letter-spacing:1.2px">'+esc(c.name)+'</div>'+
+    '<div class="prod-grid" style="margin-top:8px">'+items.map(p=>{
       const gi=ALL_PRODS.indexOf(p);
       const stockTxt = p.stock===null ? '' : (p.stock<=0 ? '<div style="color:#c0392b;font-weight:800;font-size:11px;margin-top:4px">AGOTADO</div>' : '<div style="color:'+(p.stock<=5?'#b45309;font-weight:800':'#7a6a62;font-weight:600')+';font-size:11px;margin-top:4px">Quedan '+p.stock+'</div>');
-      return `<button class="prod" data-g="${gi}"><div class="pn">${p.name}</div><div class="pp">${fmt(p.price)}</div>${stockTxt}</button>`;}).join('')}</div>`;
+      const img = p.image ? '<img src="'+esc(p.image)+'" onerror="this.style.display=\'none\'" style="width:100%;height:88px;object-fit:cover;border-radius:9px;margin-bottom:7px">' : '';
+      return '<button class="prod" data-g="'+gi+'">'+img+'<div class="pn">'+p.name+'</div><div class="pp">'+fmt(p.price)+'</div>'+stockTxt+'</button>';
+    }).join('')+'</div>';
   }).join('');
   document.querySelectorAll('.prod').forEach(b=>b.onclick=()=>{
     const p=ALL_PRODS[+b.dataset.g];
+    if(!p) return;
     if(p.stock!==null && p.stock<=0){ toast('⚠️ '+p.name+' agotado'); return; }
     const inCart=cart.filter(i=>i.name===p.name).reduce((s,i)=>s+i.qty,0);
     if(p.stock!==null && inCart+1>p.stock){ toast('⚠️ Solo quedan '+p.stock+' de '+p.name); return; }
     const ex=cart.find(i=>i.name===p.name);
     if(ex) ex.qty++; else cart.push({name:p.name, price:p.price, qty:1});
-    renderCart(); toast(`✓ ${p.name}`);
+    renderCart(); toast('✓ '+p.name);
   });
 }
 
@@ -1640,7 +1709,7 @@ document.getElementById('aq-confirm').onclick=async ()=>{
 
 /* ================= INIT ================= */
 function renderAll(){
-  ['renderArqueos','renderCartaAdmin','renderCart','renderQuick','renderPedidos','renderKds','renderControl','renderInformes','renderFichaje','renderCaja','renderDriverSelects']
+  ['renderArqueos','renderCartaAdmin','renderCart','renderQuick','renderPedidos','renderKds','renderControl','renderDashboard','renderInformes','renderFichaje','renderFichajeReminder','renderCaja','renderDriverSelects','checkNewOrders']
     .forEach(fn=>{ try{ window[fn](); }catch(e){ console.error('Error en '+fn+':', e); } });
   try{ renderCatalog(document.getElementById('prod-search').value); }catch(e){ console.error('Error en renderCatalog:', e); }
 }

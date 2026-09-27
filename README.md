@@ -85,3 +85,13 @@ El diálogo de imprimir del navegador sirve para empezar. Para imprimir sin diá
 1. Instala **QZ Tray** (gratis, qz.io) en el PC de la caja
 2. Lanza Chrome con `--kiosk-printing` para tickets silenciosos con la impresora por defecto
 3. (Avanzado) Integración RAW con QZ Tray vía websockets — consultar cuando se necesite
+
+## Fase A (Qamarero): fotos, panel, sonido y recordatorios
+
+- **Categorías con color** (paleta automática) y **fotos en productos**: campo "URL foto" en Control → Carta. Pega la URL de una imagen (puedes subirla gratis a postimages.org o Imgur) y aparece en la tarjeta del catálogo
+- **Panel resumen en Control**: ventas de hoy, pedidos abiertos/cerrados y estado del stock con accesos rápidos a Caja y Nuevo pedido
+- **🔊 Sonido al entrar pedido nuevo** (activable en Configuración) — útil con pedidos online
+- **Recordatorio de fichaje**: aviso amarillo si olvidaste cerrar el fichaje de la jornada anterior
+
+### Actualizar una instalación existente
+Ejecuta `supabase/schema-update-faseA-qm.sql` y sube el nuevo `index.html`.
