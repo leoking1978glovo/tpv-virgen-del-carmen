@@ -189,12 +189,12 @@
 .cat-tile{border:none;border-radius:16px;color:#fff;font-weight:800;font-size:13px;padding:14px 8px;min-height:64px;box-shadow:var(--shadow);cursor:pointer;transition:.15s;line-height:1.2;font-family:inherit}
 .cat-tile:hover{transform:translateY(-2px)}
 #cat-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px;margin-bottom:14px}
-.prod-grid.tiles{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
-.prod.tile{position:relative;height:134px;padding:0;border-radius:16px;overflow:hidden;border:2px solid var(--line);box-shadow:var(--shadow);cursor:pointer;background:#fff;font-family:inherit}
+.prod-grid.tiles{grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:10px}
+.prod.tile{position:relative;aspect-ratio:1/1;height:auto;padding:0;border-radius:14px;overflow:hidden;border:2px solid var(--line);box-shadow:var(--shadow);cursor:pointer;background:#fff;font-family:inherit}
 .prod.tile:hover{border-color:var(--accent);transform:translateY(-2px)}
-.tile-badge{position:absolute;top:8px;font-size:10px;font-weight:800;padding:3px 9px;border-radius:99px;letter-spacing:.5px;z-index:2}
+.tile-badge{position:absolute;top:5px;font-size:8px;font-weight:800;padding:2px 6px;border-radius:99px;letter-spacing:.4px;z-index:2}
 .tile-badge.ult{left:8px;background:#c0392b;color:#fff}
-.tile-badge.agot{left:50%;transform:translateX(-50%);top:38%;background:rgba(255,255,255,.94);color:#c0392b;font-size:12px;padding:6px 13px}
+.tile-badge.agot{left:50%;transform:translateX(-50%);top:32%;background:rgba(255,255,255,.94);color:#c0392b;font-size:9px;padding:4px 9px}
 
 /* ---------- PRINT TICKET ---------- */
   #ticket-print{display:none}
@@ -1297,8 +1297,8 @@ function renderCatalog(filter=''){
       : '<div style="position:absolute;inset:0;background:linear-gradient(135deg,'+col+','+col+'cc);"></div>';
     return '<button class="prod tile" data-g="'+gi+'">'+img+
       '<div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(20,8,4,.8),rgba(20,8,4,0) 55%);"></div>'+badges+
-      '<div style="position:absolute;left:10px;right:10px;bottom:9px;text-align:left"><div style="color:#fff;font-weight:700;font-size:13px;line-height:1.25;text-shadow:0 1px 3px rgba(0,0,0,.55)">'+p.name+'</div>'+
-      '<div style="color:#ffcf9e;font-weight:800;font-size:14px;margin-top:2px">'+fmt(p.price)+'</div></div></button>';
+      '<div style="position:absolute;left:8px;right:8px;bottom:6px;text-align:left"><div style="color:#fff;font-weight:700;font-size:11px;line-height:1.2;text-shadow:0 1px 3px rgba(0,0,0,.55)">'+p.name+'</div>'+
+      '<div style="color:#ffcf9e;font-weight:800;font-size:12px;margin-top:1px">'+fmt(p.price)+'</div></div></button>';
   }).join('')+'</div>';
   document.querySelectorAll('#catalog .prod').forEach(b=>b.onclick=()=>{
     const p=ALL_PRODS[+b.dataset.g];
