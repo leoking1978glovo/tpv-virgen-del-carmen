@@ -876,13 +876,15 @@ async function loadSettings(){
       if(data) data.forEach(r=>{
         CONFIG[r.key]=r.value;
         if(r.key.indexOf('catcolor_')===0) CAT_CUSTOM[r.key.slice(9)]=r.value;
-        if(r.key==='favorites'){ try{ FAVS=JSON.parse(r.value||'[]'); }catch(e){} }
+        if(r.key==='favorites'){ window.__favsSet=true; try{ FAVS=JSON.parse(r.value||'[]'); }catch(e){} }
       });
+  if(!window.__favsSet) FAVS=DEFAULT_FAVS.slice();
     }catch(e){}
   } else {
     try{ const s=JSON.parse(localStorage.getItem('tpv_settings')||'{}'); Object.assign(CONFIG,s); }catch(e){}
   try{ CAT_CUSTOM=JSON.parse(localStorage.getItem('tpv_catcolors')||'{}'); }catch(e){}
-  try{ FAVS=JSON.parse(localStorage.getItem('tpv_favs')||'[]'); }catch(e){}
+  if(localStorage.getItem('tpv_favs')===null) FAVS=DEFAULT_FAVS.slice();
+  else { try{ FAVS=JSON.parse(localStorage.getItem('tpv_favs')||'[]'); }catch(e){} }
   }
   fillConfigForm();
 }
@@ -1268,6 +1270,7 @@ let ALL_PRODS = CATEGORIES.flatMap(cc=>cc.items);
 let catFilter='__all';
 let CAT_CUSTOM={};
 let FAVS=[];
+const DEFAULT_FAVS=['Pollo asado entero','Medio pollo asado','Combo familiar','Patatas fritas caseras','Refrescos'];
 const CAT_COLORS=['#7a1d0e','#b4701b','#1e8f5a','#1a56db','#6d28d9','#b45309','#0e7490','#be185d'];
 function catOf(p){ const i=CATEGORIES.findIndex(c=>c.items.indexOf(p)!==-1); return i<0?0:i; }
 function catColor(name,ci){ return CAT_CUSTOM[name]||CAT_COLORS[ci%CAT_COLORS.length]; }
