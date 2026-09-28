@@ -186,6 +186,16 @@
 .ksearch input{padding:10px 13px;border:2px solid var(--line);border-radius:11px;font-size:13px;font-weight:600;background:var(--card)}
 .ksearch input[type=text]{flex:1;min-width:150px}
 
+.cat-tile{border:none;border-radius:16px;color:#fff;font-weight:800;font-size:13px;padding:14px 8px;min-height:64px;box-shadow:var(--shadow);cursor:pointer;transition:.15s;line-height:1.2;font-family:inherit}
+.cat-tile:hover{transform:translateY(-2px)}
+#cat-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:10px;margin-bottom:14px}
+.prod-grid.tiles{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.prod.tile{position:relative;height:134px;padding:0;border-radius:16px;overflow:hidden;border:2px solid var(--line);box-shadow:var(--shadow);cursor:pointer;background:#fff;font-family:inherit}
+.prod.tile:hover{border-color:var(--accent);transform:translateY(-2px)}
+.tile-badge{position:absolute;top:8px;font-size:10px;font-weight:800;padding:3px 9px;border-radius:99px;letter-spacing:.5px;z-index:2}
+.tile-badge.ult{left:8px;background:#c0392b;color:#fff}
+.tile-badge.agot{left:50%;transform:translateX(-50%);top:38%;background:rgba(255,255,255,.94);color:#c0392b;font-size:12px;padding:6px 13px}
+
 /* ---------- PRINT TICKET ---------- */
   #ticket-print{display:none}
   @media print{
@@ -282,6 +292,7 @@
         <div class="quick-btns" id="quick-btns"></div>
 
         <div class="search-row"><input type="text" id="prod-search" placeholder="🔍 Buscar producto…"></div>
+        <div id="cat-tiles"></div>
         <div id="catalog"></div>
       </div>
 
@@ -863,10 +874,14 @@ async function loadSettings(){
   if(sb){
     try{
       const { data } = await sb.from('settings').select('*');
-      if(data) data.forEach(r=>{ CONFIG[r.key]=r.value; });
+      if(data) data.forEach(r=>{
+        CONFIG[r.key]=r.value;
+        if(r.key.indexOf('catcolor_')===0) CAT_CUSTOM[r.key.slice(9)]=r.value;
+      });
     }catch(e){}
   } else {
     try{ const s=JSON.parse(localStorage.getItem('tpv_settings')||'{}'); Object.assign(CONFIG,s); }catch(e){}
+  try{ CAT_CUSTOM=JSON.parse(localStorage.getItem('tpv_catcolors')||'{}'); }catch(e){}
   }
   fillConfigForm();
 }
@@ -932,10 +947,19 @@ async function uploadProductPhoto(ci, pi, file){
   }catch(e){ toast('⚠️ Error subiendo la foto'); }
 }
 
+async function saveCatColor(name, color){
+  CAT_CUSTOM[name]=color;
+  if(sb){ await sb.from('settings').upsert({ key:'catcolor_'+name, value:color }, { onConflict:'key' }); }
+  else { localStorage.setItem('tpv_catcolors', JSON.stringify(CAT_CUSTOM)); }
+  renderAll(); toast('\u{1F3A8} Color guardado: '+name);
+}
+
 function renderCartaAdmin(){
   const el=document.getElementById('carta-admin'); if(!el) return;
   el.innerHTML = CATEGORIES.map((c,ci)=>
-    '<div class="cat-title">'+c.name+'</div>' +
+    '<div class="cat-title" style="display:flex;align-items:center;gap:8px">'+c.name+
+      ' <input type="color" value="'+catColor(c.name,ci)+'" data-cc="'+esc(c.name)+'" title="Color del cuadro de categor\u00eda" style="width:36px;height:24px;padding:0;border:none;background:none;cursor:pointer">'+
+      ' <button class="btn btn-ghost" data-ccs="'+esc(c.name)+'" style="padding:5px 9px;font-size:12px">\u{1F3A8}</button></div>' +
     c.items.map((p,pi)=>'<div class="driver-row"><span class="dn">'+p.name+'</span>'+
       '<input type="number" value="'+p.price+'" step="0.05" min="0" data-cp="'+ci+'-'+pi+'" style="width:92px;padding:8px;border:2px solid var(--line);border-radius:10px;font-weight:700">'+
       '<span style="font-size:12px;color:var(--ink2)">€</span>'+
@@ -954,6 +978,11 @@ function renderCartaAdmin(){
       const parts=f.dataset.fu.split('-');
       uploadProductPhoto(+parts[0], +parts[1], f.files[0]);
     }
+  });
+  el.querySelectorAll('[data-ccs]').forEach(b=>b.onclick=async ()=>{
+    const name=b.dataset.ccs;
+    const inp=[...el.querySelectorAll('[data-cc]')].find(i=>i.dataset.cc===name);
+    if(inp) await saveCatColor(name, inp.value);
   });
   el.querySelectorAll('[data-sv]').forEach(b=>b.onclick=async ()=>{
     const parts=b.dataset.sv.split('-'); const ci=+parts[0], pi=+parts[1];
@@ -1225,34 +1254,64 @@ function renderCart(){
 
 /* ================= RENDER: CATALOG ================= */
 let ALL_PRODS = CATEGORIES.flatMap(cc=>cc.items);
+let catFilter='__all';
+let CAT_CUSTOM={};
 const CAT_COLORS=['#7a1d0e','#b4701b','#1e8f5a','#1a56db','#6d28d9','#b45309','#0e7490','#be185d'];
-function renderCatalog(filter=''){
-  const f=(filter||'').toLowerCase();
-  document.getElementById('catalog').innerHTML = CATEGORIES.map((c,ci)=>{
-    const items=c.items.filter(p=>(p.name||'').toLowerCase().includes(f));
-    if(!items.length) return '';
-    const col=CAT_COLORS[ci%CAT_COLORS.length];
-    return '<div class="cat-title" style="display:inline-block;background:'+col+';color:#fff;padding:6px 16px;border-radius:10px;font-size:11px;letter-spacing:1.2px">'+esc(c.name)+'</div>'+
-    '<div class="prod-grid" style="margin-top:8px">'+items.map(p=>{
-      const gi=ALL_PRODS.indexOf(p);
-      const stockTxt = p.stock===null ? '' : (p.stock<=0 ? '<div style="color:#c0392b;font-weight:800;font-size:11px;margin-top:4px">AGOTADO</div>' : '<div style="color:'+(p.stock<=5?'#b45309;font-weight:800':'#7a6a62;font-weight:600')+';font-size:11px;margin-top:4px">Quedan '+p.stock+'</div>');
-      const img = p.image ? '<img src="'+esc(p.image)+'" onerror="this.style.display=\'none\'" style="width:100%;height:88px;object-fit:cover;border-radius:9px;margin-bottom:7px">' : '';
-      return '<button class="prod" data-g="'+gi+'">'+img+'<div class="pn">'+p.name+'</div><div class="pp">'+fmt(p.price)+'</div>'+stockTxt+'</button>';
-    }).join('')+'</div>';
+function catOf(p){ const i=CATEGORIES.findIndex(c=>c.items.indexOf(p)!==-1); return i<0?0:i; }
+function catColor(name,ci){ return CAT_CUSTOM[name]||CAT_COLORS[ci%CAT_COLORS.length]; }
+
+function renderCatTiles(){
+  const el=document.getElementById('cat-tiles'); if(!el) return;
+  const tiles=CATEGORIES.map((c,ci)=>{
+    const col=catColor(c.name,ci);
+    const act=catFilter===c.name;
+    return '<button class="cat-tile" data-cat="'+esc(c.name)+'" style="background:'+col+';'+(act?'outline:3px solid #2a1510;outline-offset:2px;':'')+'">'+esc(c.name)+'</button>';
   }).join('');
-  document.querySelectorAll('.prod').forEach(b=>b.onclick=()=>{
-    const p=ALL_PRODS[+b.dataset.g];
-    if(!p) return;
-    if(p.stock!==null && p.stock<=0){ toast('⚠️ '+p.name+' agotado'); return; }
-    const inCart=cart.filter(i=>i.name===p.name).reduce((s,i)=>s+i.qty,0);
-    if(p.stock!==null && inCart+1>p.stock){ toast('⚠️ Solo quedan '+p.stock+' de '+p.name); return; }
-    const ex=cart.find(i=>i.name===p.name);
-    if(ex) ex.qty++; else cart.push({name:p.name, price:p.price, qty:1});
-    renderCart(); toast('✓ '+p.name);
+  const allAct=catFilter==='__all';
+  el.innerHTML='<button class="cat-tile" data-cat="__all" style="background:#2a1510;'+(allAct?'outline:3px solid var(--accent);outline-offset:2px;':'')+'">&#9733; Todos</button>'+tiles;
+  el.querySelectorAll('.cat-tile').forEach(b=>b.onclick=()=>{
+    catFilter=b.dataset.cat;
+    renderCatalog(document.getElementById('prod-search').value);
   });
 }
 
-/* ================= RENDER: QUICK ================= */
+function renderCatalog(filter=''){
+  renderCatTiles();
+  const f=(filter||'').toLowerCase();
+  const list=ALL_PRODS.filter(p=>{
+    if(catFilter!=='__all'){
+      const ci=catOf(p);
+      if(!CATEGORIES[ci]||CATEGORIES[ci].name!==catFilter) return false;
+    }
+    return (p.name||'').toLowerCase().includes(f);
+  });
+  document.getElementById('catalog').innerHTML='<div class="prod-grid tiles">'+list.map(p=>{
+    const gi=ALL_PRODS.indexOf(p);
+    const ci=catOf(p);
+    const col=catColor(CATEGORIES[ci]?CATEGORIES[ci].name:'',ci);
+    const agotado=p.stock!==null&&p.stock<=0;
+    const pocas=!agotado&&p.stock!==null&&p.stock<=5;
+    const badges=(agotado?'<span class="tile-badge agot">AGOTADO</span>':'')+(pocas?'<span class="tile-badge ult">&#218;LTIMAS UDS.</span>':'');
+    const img=p.image
+      ? '<img src="'+esc(p.image)+'" onerror="this.style.display=\'none\'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;'+(agotado?'filter:grayscale(1) brightness(.75);':'')+'">'
+      : '<div style="position:absolute;inset:0;background:linear-gradient(135deg,'+col+','+col+'cc);"></div>';
+    return '<button class="prod tile" data-g="'+gi+'">'+img+
+      '<div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(20,8,4,.8),rgba(20,8,4,0) 55%);"></div>'+badges+
+      '<div style="position:absolute;left:10px;right:10px;bottom:9px;text-align:left"><div style="color:#fff;font-weight:700;font-size:13px;line-height:1.25;text-shadow:0 1px 3px rgba(0,0,0,.55)">'+p.name+'</div>'+
+      '<div style="color:#ffcf9e;font-weight:800;font-size:14px;margin-top:2px">'+fmt(p.price)+'</div></div></button>';
+  }).join('')+'</div>';
+  document.querySelectorAll('#catalog .prod').forEach(b=>b.onclick=()=>{
+    const p=ALL_PRODS[+b.dataset.g];
+    if(!p) return;
+    if(p.stock!==null && p.stock<=0){ toast('&#9888;&#65039; '+p.name+' agotado'); return; }
+    const inCart=cart.filter(i=>i.name===p.name).reduce((s,i)=>s+i.qty,0);
+    if(p.stock!==null && inCart+1>p.stock){ toast('&#9888;&#65039; Solo quedan '+p.stock+' de '+p.name); return; }
+    const ex=cart.find(i=>i.name===p.name);
+    if(ex) ex.qty++; else cart.push({name:p.name, price:p.price, qty:1});
+    renderCart(); toast('&#10003; '+p.name);
+  });
+}
+
 function renderQuick(){
   const quicks=[['🍗','Pollo a l\'ast entero'],['🍗','Medio pollo a l\'ast'],['🍟','Patatas fritas (ración)'],['📦','Menú familiar (pollo + patatas + bebida)'],['🥤','Coca-Cola (33cl)'],['🍺','Cerveza (33cl)']];
   document.getElementById('quick-btns').innerHTML = quicks.map(q=>`<button class="quick" data-q="${q[1]}">${q[0]} ${q[1]}</button>`).join('');
