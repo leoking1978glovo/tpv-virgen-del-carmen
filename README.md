@@ -125,3 +125,11 @@ Ejecuta `supabase/schema-update-faseC-qm.sql` y sube `index.html` + `valorar.htm
 
 ### Actualizar una instalación existente
 Ejecuta `supabase/schema-update-fotos.sql` y sube el nuevo `index.html`.
+
+## Reinicio de operativa (con PIN)
+
+- Control → ⚠️ Zona peligrosa → "Reiniciar datos de operativa" → pide PIN
+- Borra SOLO: pedidos (+líneas), caja (sesiones, movimientos, arqueos) y valoraciones; la numeración vuelve a #1
+- NO toca: carta, configuración, repartidores, empleados ni fichajes
+- El PIN se cambia en Control → ⚙️ Configuración ("PIN de reinicio", por defecto 1234)
+- Requiere ejecutar `supabase/schema-update-reset.sql` una vez

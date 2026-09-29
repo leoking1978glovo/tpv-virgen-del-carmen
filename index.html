@@ -439,11 +439,17 @@
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap"><input type="checkbox" id="cfg-autoprint"> Imprimir comanda al enviar a cocina</label>
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap"><input type="checkbox" id="cfg-sound"> 🔊 Sonido al entrar pedido nuevo</label>
             <input type="number" id="cfg-fee" placeholder="Suplemento domicilio €" step="0.1" min="0" style="max-width:160px">
+            <input type="text" id="cfg-resetpin" placeholder="PIN de reinicio" maxlength="12" style="max-width:130px" title="PIN para el boton de reinicio de datos">
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap"><input type="checkbox" id="cfg-blind"> 🙈 Arqueo ciego</label>
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap"><input type="checkbox" id="cfg-rate"> ⭐ QR valoración en ticket</label>
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600;white-space:nowrap"><input type="checkbox" id="cfg-webopen"> 🌐 Aceptar pedidos online</label>
             <button class="btn btn-red" id="btn-cfg">Guardar</button>
           </div>
+        </div>
+        <div class="drivers-card" style="border:2px solid #f0c9c0;background:#fdf3f1">
+          <h3 style="color:#c0392b">&#9888;&#65039; Zona peligrosa</h3>
+          <p style="font-size:12px;color:#7a6a62;margin-bottom:10px">Reinicia los datos de operativa: <b>pedidos, caja, arqueos y valoraciones</b>.<br>NO toca la carta, la configuraci&oacute;n, repartidores ni empleados. Requiere PIN.</p>
+          <button class="btn" id="btn-reset" style="background:#c0392b;color:#fff">&#128465;&#65039; Reiniciar datos de operativa</button>
         </div>
         <div class="ped-grid" id="control-list"></div>
       </div>
@@ -497,6 +503,19 @@
   </div>
 </div>
 
+
+<!-- MODAL REINICIO -->
+<div class="modal-back" id="modal-reinicio">
+  <div class="modal">
+    <h2 style="color:#c0392b">&#9888;&#65039; Reiniciar datos de operativa</h2>
+    <p class="msub">Se borrar&aacute;n <b>todos los pedidos, la caja (sesiones, movimientos y arqueos) y las valoraciones</b>, y la numeraci&oacute;n volver&aacute; a empezar en #1.<br><br>Se conservan: la carta, la configuraci&oacute;n, repartidores y empleados.<br><b>Esta acci&oacute;n no se puede deshacer.</b></p>
+    <div class="mfield"><label>PIN de reinicio</label><input type="password" id="reset-pin" placeholder="&#8226;&#8226;&#8226;&#8226;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modal-reinicio')">Volver</button>
+      <button class="btn" id="reset-confirm" style="flex:1;background:#c0392b;color:#fff">&#128465;&#65039; Sí, borrar todo y empezar de cero</button>
+    </div>
+  </div>
+</div>
 
 <!-- MODAL CANCELAR -->
 <div class="modal-back" id="modal-cancelar">
@@ -843,7 +862,7 @@ function applyRoleUI(){
 /* ================= CONFIG ================= */
 let CONFIG = { businessName:'Asador de Pollos Virgen del Carmen', businessAddr:'',
   businessPhone:'', businessNif:'', ticketFooter:'¡Gracias por su compra!',
-  autoPrintKitchen:'1', soundNewOrder:'1', blindArqueo:'0', deliveryFee:'0', rateQr:'1', webOpen:'1', webDomicilio:'0' };
+  autoPrintKitchen:'1', soundNewOrder:'1', blindArqueo:'0', deliveryFee:'0', rateQr:'1', webOpen:'1', webDomicilio:'0', resetPin:'1234' };
 function fillConfigForm(){
   document.getElementById('cfg-name').value=CONFIG.businessName||'';
   document.getElementById('cfg-addr').value=CONFIG.businessAddr||'';
@@ -854,6 +873,7 @@ function fillConfigForm(){
   document.getElementById('cfg-sound').checked = CONFIG.soundNewOrder==='1';
   document.getElementById('cfg-blind').checked = CONFIG.blindArqueo==='1';
   document.getElementById('cfg-fee').value=CONFIG.deliveryFee||'';
+  document.getElementById('cfg-resetpin').value=CONFIG.resetPin||'';
   document.getElementById('cfg-rate').checked = CONFIG.rateQr==='1';
   document.getElementById('cfg-webopen').checked = CONFIG.webOpen==='1';
 }
@@ -867,6 +887,7 @@ function readConfigForm(){
   CONFIG.soundNewOrder=document.getElementById('cfg-sound').checked?'1':'0';
   CONFIG.blindArqueo=document.getElementById('cfg-blind').checked?'1':'0';
   CONFIG.deliveryFee=document.getElementById('cfg-fee').value.trim()||'0';
+  CONFIG.resetPin=document.getElementById('cfg-resetpin').value.trim()||'1234';
   CONFIG.rateQr=document.getElementById('cfg-rate').checked?'1':'0';
   CONFIG.webOpen=document.getElementById('cfg-webopen').checked?'1':'0';
 }
@@ -1127,6 +1148,26 @@ function renderResenas(){
   el.innerHTML='<div style="display:flex;gap:18px;margin-bottom:10px;font-weight:700;font-size:15px"><span style="color:var(--green)">👍 '+ups+'</span><span style="color:var(--red)">👎 '+(rs.length-ups)+'</span><span style="color:var(--ink2);font-size:12px;font-weight:600;align-self:center">'+(rs.length?Math.round(ups/rs.length*100):0)+'% positivas</span></div>'+
     rs.slice(0,15).map(r=>'<div class="driver-row"><span style="font-size:16px">'+(r.rating==='up'?'👍':'👎')+'</span><span class="dn">Pedido #'+r.order_id+(r.comment?' — '+esc(r.comment):'')+'</span><b style="font-size:12px;color:var(--ink2);white-space:nowrap">'+new Date(r.created_at).toLocaleDateString('es-ES')+'</b></div>').join('');
 }
+
+/* ================= REINICIO DE OPERATIVA (con PIN) ================= */
+document.getElementById('btn-reset').onclick=()=>{
+  if(!sb){ toast('&#9888;&#65039; Necesitas conexi&oacute;n para reiniciar'); return; }
+  document.getElementById('reset-pin').value='';
+  openModal('modal-reinicio');
+};
+document.getElementById('reset-confirm').onclick=async ()=>{
+  if(!sb){ toast('&#9888;&#65039; Necesitas conexi&oacute;n'); return; }
+  const pin=document.getElementById('reset-pin').value;
+  if(!pin){ toast('&#9888;&#65039; Escribe el PIN'); return; }
+  const { data, error } = await sb.rpc('reset_operativa', { pin });
+  if(error){ toast('&#9888;&#65039; Error: '+error.message); return; }
+  if(!data || !data.ok){ toast('&#128274; PIN incorrecto'); return; }
+  closeModal('modal-reinicio');
+  seenOrderIds=null;
+  await dbLoadAll();
+  renderAll();
+  toast('&#128465;&#65039; Datos de operativa reiniciados &mdash; todo a cero. Recuerda abrir la caja.');
+};
 
 /* ================= FASE A: dashboard, sonido, recordatorios ================= */
 function renderDashboard(){
