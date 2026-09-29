@@ -649,7 +649,7 @@ function rebuildCatalog(prods){
 
 async function dbLoadAll(){
   const today=new Date(); today.setHours(0,0,0,0);
-  const sess = await sb.from('cash_sessions').select('*').is('closed_at',null).maybeSingle();
+  const sess = await sb.from('cash_sessions').select('*').is('closed_at',null).order('opened_at',{ascending:false}).limit(1).maybeSingle();
   const cajaId = sess.data ? sess.data.id : null;
   const [prods,drv,ords,ss,movs,revs] = await Promise.all([
     sb.from('products').select('*').eq('active',true).order('position'),
