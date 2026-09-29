@@ -1,5 +1,5 @@
--- Botón de reinicio protegido con PIN: borra SOLO pedidos, caja, arqueos y valoraciones
--- NO toca: products (carta), settings (configuración), drivers, staff_roles, time_clock
+-- Botón de reinicio protegido con PIN (v2: WHERE true para el modo seguro de Supabase)
+-- Borra SOLO pedidos, caja, arqueos y valoraciones. NO toca carta, configuración, repartidores, empleados ni fichajes.
 create or replace function public.reset_operativa(pin text)
 returns jsonb
 language plpgsql
@@ -13,12 +13,12 @@ begin
     return jsonb_build_object('ok', false, 'error', 'pin');
   end if;
 
-  delete from order_items;
-  delete from orders;
-  delete from cash_movements;
-  delete from cash_sessions;
-  delete from cash_arqueos;
-  delete from reviews;
+  delete from order_items where true;
+  delete from orders where true;
+  delete from cash_movements where true;
+  delete from cash_sessions where true;
+  delete from cash_arqueos where true;
+  delete from reviews where true;
 
   alter table orders alter column id restart with 1;
   alter table order_items alter column id restart with 1;
@@ -33,6 +33,5 @@ $func$;
 
 grant execute on function public.reset_operativa(text) to authenticated;
 
--- PIN por defecto (cámbialo en el TPV: Control -> Configuración)
 insert into settings (key, value) values ('resetPin', '1234')
 on conflict (key) do nothing;

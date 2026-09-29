@@ -977,7 +977,7 @@ async function toggleFav(name){
   if(i>=0) FAVS.splice(i,1); else FAVS.push(name);
   if(sb){ await sb.from('settings').upsert({ key:'favorites', value:JSON.stringify(FAVS) }, { onConflict:'key' }); }
   else { localStorage.setItem('tpv_favs', JSON.stringify(FAVS)); }
-  renderAll(); toast(i>=0?'Quitado de favoritos: '+name:'&#9733; Favorito añadido: '+name);
+  renderAll(); toast(i>=0?'Quitado de favoritos: '+name:'⭐ Favorito añadido: '+name);
 }
 
 async function saveCatColor(name, color){
@@ -1151,22 +1151,22 @@ function renderResenas(){
 
 /* ================= REINICIO DE OPERATIVA (con PIN) ================= */
 document.getElementById('btn-reset').onclick=()=>{
-  if(!sb){ toast('&#9888;&#65039; Necesitas conexi&oacute;n para reiniciar'); return; }
+  if(!sb){ toast('⚠️ Necesitas conexión para reiniciar'); return; }
   document.getElementById('reset-pin').value='';
   openModal('modal-reinicio');
 };
 document.getElementById('reset-confirm').onclick=async ()=>{
-  if(!sb){ toast('&#9888;&#65039; Necesitas conexi&oacute;n'); return; }
+  if(!sb){ toast('⚠️ Necesitas conexión'); return; }
   const pin=document.getElementById('reset-pin').value;
-  if(!pin){ toast('&#9888;&#65039; Escribe el PIN'); return; }
+  if(!pin){ toast('⚠️ Escribe el PIN'); return; }
   const { data, error } = await sb.rpc('reset_operativa', { pin });
-  if(error){ toast('&#9888;&#65039; Error: '+error.message); return; }
-  if(!data || !data.ok){ toast('&#128274; PIN incorrecto'); return; }
+  if(error){ toast('⚠️ Error: '+error.message); return; }
+  if(!data || !data.ok){ toast('🔒 PIN incorrecto'); return; }
   closeModal('modal-reinicio');
   seenOrderIds=null;
   await dbLoadAll();
   renderAll();
-  toast('&#128465;&#65039; Datos de operativa reiniciados &mdash; todo a cero. Recuerda abrir la caja.');
+  toast('🗑️ Datos de operativa reiniciados — todo a cero. Recuerda abrir la caja.');
 };
 
 /* ================= FASE A: dashboard, sonido, recordatorios ================= */
