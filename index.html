@@ -1166,7 +1166,8 @@ document.getElementById('reset-confirm').onclick=async ()=>{
   seenOrderIds=null;
   await dbLoadAll();
   renderAll();
-  toast('🗑️ Datos de operativa reiniciados — todo a cero. Recuerda abrir la caja.');
+  const b=(data&&data.borrados)||{};
+  toast('🗑️ Borrados: '+(b.pedidos||0)+' pedidos, '+(b.movimientos||0)+' movimientos, '+(b.arqueos||0)+' arqueos, '+(b.valoraciones||0)+' valoraciones, '+(b.fichajes||0)+' fichajes. Todo a cero — recuerda abrir la caja.');
 };
 
 /* ================= FASE A: dashboard, sonido, recordatorios ================= */
