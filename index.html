@@ -194,6 +194,7 @@
 .prod.tile:hover{border-color:var(--accent);transform:translateY(-2px)}
 .tile-badge{position:absolute;top:5px;font-size:8px;font-weight:800;padding:2px 6px;border-radius:99px;letter-spacing:.4px;z-index:2}
 .tile-badge.ult{left:8px;background:#c0392b;color:#fff}
+.tile-badge.qty{right:6px;left:auto;background:rgba(0,0,0,.55);color:#fff;font-weight:700}
 .tile-badge.agot{left:50%;transform:translateX(-50%);top:32%;background:rgba(255,255,255,.94);color:#c0392b;font-size:9px;padding:4px 9px}
 
 /* ---------- PRINT TICKET ---------- */
@@ -1309,7 +1310,8 @@ function renderCatalog(filter=''){
     const col=catColor(CATEGORIES[ci]?CATEGORIES[ci].name:'',ci);
     const agotado=p.stock!==null&&p.stock<=0;
     const pocas=!agotado&&p.stock!==null&&p.stock<=5;
-    const badges=(agotado?'<span class="tile-badge agot">AGOTADO</span>':'')+(pocas?'<span class="tile-badge ult">&#218;LTIMAS UDS.</span>':'');
+    const qtyB=(p.stock!==null&&!agotado)?'<span class="tile-badge qty">'+p.stock+' uds</span>':'';
+    const badges=qtyB+(agotado?'<span class="tile-badge agot">AGOTADO</span>':'')+(pocas?'<span class="tile-badge ult">&#218;LTIMAS UDS.</span>':'');
     const img=p.image
       ? '<img src="'+esc(p.image)+'" onerror="this.style.display=\'none\'" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;'+(agotado?'filter:grayscale(1) brightness(.75);':'')+'">'
       : '<div style="position:absolute;inset:0;background:linear-gradient(135deg,'+col+','+col+'cc);"></div>';
